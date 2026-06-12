@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minion AI — Train Your Personal Agent</title>
+  <meta name="description" content="Personalize a multi-agent AI framework for your field, industry, and skills.">
+  <link rel="stylesheet" href="/css/style.css?v=52">
+</head>
+<body>
+  <header class="site-header" id="site-header">
+    <div class="logo" id="logo-home" role="button" tabindex="0" title="Go to home">
+      <div class="logo-icon">✦</div>
+      Minion AI
+    </div>
+    <nav class="nav-actions">
+      <span id="nav-guest" class="hidden">
+        <button class="nav-link" id="show-login">Log in</button>
+        <button class="btn btn-pastel" id="show-register">Try for free</button>
+      </span>
+      <span id="nav-authed" class="hidden" style="display:flex;align-items:center;gap:0.75rem">
+        <button class="nav-link" id="nav-workspace" type="button">Home</button>
+        <span class="user-email" id="user-email"></span>
+        <button class="nav-link" id="logout-btn">Log out</button>
+      </span>
+    </nav>
+  </header>
+
+  <!-- Home — collaboration hub (Slack sidebar + Claude main) -->
+  <div data-view="home" class="hidden">
+    <div class="collab-shell">
+      <aside class="collab-sidebar collapsed" id="collab-sidebar">
+        <div class="collab-sidebar-rail">
+          <div class="collab-rail-nav">
+            <button type="button" class="collab-rail-btn collab-rail-logo-btn" id="collab-rail-logo" title="Minion AI home" aria-label="Minion AI home">
+              <span class="collab-rail-logo-icon" aria-hidden="true">✦</span>
+            </button>
+            <button type="button" class="collab-rail-btn" id="collab-sidebar-toggle" title="Expand sidebar" aria-label="Expand sidebar">
+              <span class="collab-rail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><line x1="9.5" y1="4.5" x2="9.5" y2="19.5"/></svg>
+              </span>
+            </button>
+            <button type="button" class="collab-rail-btn collab-rail-btn-primary" id="collab-rail-new-chat" title="New chat" aria-label="New chat">
+              <span class="collab-rail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+              </span>
+            </button>
+            <button type="button" class="collab-rail-btn" id="collab-rail-agents" title="AI agents" aria-label="AI agents">
+              <span class="collab-rail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M3 12h3M18 12h3M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3.25"/></svg>
+              </span>
+            </button>
+            <button type="button" class="collab-rail-btn" id="collab-rail-projects" title="Projects" aria-label="Projects">
+              <span class="collab-rail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7.5h15v11h-15z"/><path d="M8 7.5V6a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6v1.5"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
+              </span>
+            </button>
+            <button type="button" class="collab-rail-btn" id="collab-rail-dms" title="Direct messages" aria-label="Direct messages">
+              <span class="collab-rail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 10.5c0-2.2 1.8-4 4-4h4.5c2.2 0 4 1.8 4 4v4.5c0 2.2-1.8 4-4 4H13l-2.5 2v-2H7.5c-2.2 0-4-1.8-4-4v-4.5z"/><path d="M5.5 12.5c-1.4 0-2.5-1.1-2.5-2.5V9c0-2 1.6-3.5 3.5-3.5H10"/></svg>
+              </span>
+            </button>
+            <button type="button" class="collab-rail-btn" id="collab-rail-groups" title="Group chats" aria-label="Group chats">
+              <span class="collab-rail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="2.75"/><path d="M4.5 18.5c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5"/><circle cx="17" cy="9.5" r="2.25"/><path d="M14.25 18.5c0-1.8 1.2-3.25 3-3.25"/></svg>
+              </span>
+            </button>
+          </div>
+          <button type="button" class="collab-rail-btn collab-rail-account" id="collab-rail-account" title="Account" aria-label="Account">
+            <span class="collab-rail-account-avatar" id="collab-rail-account-avatar">?</span>
+          </button>
+        </div>
+
+        <div class="collab-sidebar-panel">
+        <div class="collab-sidebar-brand">
+          <div class="logo collab-sidebar-logo" id="collab-logo-home" role="button" tabindex="0" title="Go to home">
+            <div class="logo-icon">✦</div>
+            <span class="collab-sidebar-logo-text">Minion AI</span>
+          </div>
+          <button type="button" class="collab-sidebar-collapse-btn" id="collab-sidebar-collapse" title="Collapse sidebar" aria-label="Collapse sidebar">
+            <span class="collab-rail-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><line x1="9.5" y1="4.5" x2="9.5" y2="19.5"/></svg>
+            </span>
+          </button>
+        </div>
+        <div class="collab-sidebar-top">
+          <div class="collab-sidebar-top-row">
+            <div class="collab-quick-actions">
+              <button type="button" class="collab-action-btn accent" id="collab-new-chat" title="New chat">+ New chat</button>
+            </div>
+          </div>
+        </div>
+
+        <nav class="collab-nav">
+          <section class="collab-section" id="collab-section-agents">
+            <div class="collab-section-header">
+              <button type="button" class="collab-section-toggle" data-section="agents">
+                <span class="collab-section-icon">▾</span> AI agents
+              </button>
+              <button type="button" class="collab-icon-btn" id="collab-agents-roster-btn" title="View all agents">↗</button>
+              <button type="button" class="collab-icon-btn" id="collab-add-prebuilt" title="Add prebuilt agent">⊕</button>
+              <button type="button" class="collab-icon-btn" id="collab-new-agent" title="Create agent">+</button>
+            </div>
+            <div id="collab-agents-list" class="collab-list"></div>
+          </section>
+
+          <section class="collab-section" id="collab-section-projects">
+            <div class="collab-section-header">
+              <button type="button" class="collab-section-toggle" data-section="projects">
+                <span class="collab-section-icon">▾</span> Projects
+              </button>
+              <button type="button" class="collab-icon-btn" id="collab-new-project" title="New project">+</button>
+            </div>
+            <div class="collab-project-search-wrap">
+              <input type="search" id="collab-project-search" class="collab-project-search" placeholder="Search projects…" autocomplete="off">
+            </div>
+            <div id="collab-project-list" class="collab-list collab-project-list"></div>
+          </section>
+
+          <section class="collab-section" id="collab-section-dms">
+            <div class="collab-section-header">
+              <button type="button" class="collab-section-toggle" data-section="dms">
+                <span class="collab-section-icon">▾</span> Direct messages
+              </button>
+            </div>
+            <div id="collab-dm-list" class="collab-list"></div>
+          </section>
+
+          <section class="collab-section" id="collab-section-groups">
+            <div class="collab-section-header">
+              <button type="button" class="collab-section-toggle" data-section="groups">
+                <span class="collab-section-icon">▾</span> Group chats
+              </button>
+              <button type="button" class="collab-icon-btn" id="collab-new-group" title="New group chat">+</button>
+            </div>
+            <div id="collab-group-list" class="collab-list"></div>
+          </section>
+        </nav>
+
+        <footer class="collab-sidebar-footer">
+          <button type="button" class="collab-profile-btn" id="collab-account-btn">
+            <span class="collab-profile-avatar" id="collab-user-avatar">?</span>
+            <span class="collab-profile-info">
+              <strong id="collab-user-name">Account</strong>
+              <span id="collab-user-plan">Free plan</span>
+            </span>
+          </button>
+        </footer>
+        </div>
+      </aside>
+
+      <div class="collab-workspace">
+      <main class="collab-main">
+        <!-- Claude-style welcome -->
+        <div id="collab-welcome" class="collab-welcome">
+          <div class="collab-greeting-wrap">
+            <span class="collab-greeting-icon">✦</span>
+            <h1 id="collab-greeting" class="collab-greeting">Good afternoon</h1>
+            <p class="collab-greeting-sub">What would you like to work on?</p>
+          </div>
+          <div class="collab-hero-composer card">
+            <div id="collab-welcome-file-chip" class="workspace-file-chip hidden"></div>
+            <div class="collab-mention-wrap">
+              <div id="collab-welcome-mention-menu" class="workspace-mention-menu hidden" role="listbox" aria-label="Mention an agent"></div>
+              <div class="collab-hero-composer-inner">
+                <button type="button" class="workspace-icon-btn" id="collab-welcome-attach" title="Attach file">+</button>
+                <textarea id="collab-welcome-input" rows="2" placeholder="Ask an agent or type @ to mention…"></textarea>
+                <button type="button" class="btn btn-primary" id="collab-welcome-send">Send</button>
+              </div>
+            </div>
+            <select id="collab-welcome-agent" class="collab-agent-select hidden"></select>
+          </div>
+          <div class="collab-quick-chips">
+            <button type="button" class="collab-chip" data-starter="Analyze this data and summarize key findings">📊 Analyze data</button>
+            <button type="button" class="collab-chip" data-starter="Prepare a report with recommendations">📝 Write report</button>
+            <button type="button" class="collab-chip" data-action="new-group">👥 Group chat</button>
+          </div>
+        </div>
+
+        <!-- Agent roster -->
+        <div id="collab-agents-roster" class="collab-agents-panel hidden">
+          <div class="collab-agents-header">
+            <div class="collab-agents-header-text">
+              <p class="page-eyebrow">Your agents</p>
+              <h2>Agent personas</h2>
+              <p class="subtitle">Agents you've personalized. Expand to view framework and skills.</p>
+            </div>
+            <div class="collab-agents-header-actions">
+              <button type="button" class="btn btn-secondary" id="collab-agents-add-prebuilt">Add prebuilt agent</button>
+              <button type="button" class="btn btn-primary" id="collab-agents-create">Create agent</button>
+            </div>
+          </div>
+          <div id="collab-agents-empty" class="empty-state card hidden">
+            <div class="empty-icon">✦</div>
+            <h3>No agents yet</h3>
+            <p>Create your own agent or add a ready-made specialist from the library.</p>
+            <div class="collab-empty-actions">
+              <button type="button" class="btn btn-secondary" id="collab-roster-add-prebuilt">Browse prebuilt agents</button>
+              <button type="button" class="btn btn-primary" id="collab-roster-create">Create your first agent</button>
+            </div>
+          </div>
+          <div id="collab-agents-grid" class="personas-grid"></div>
+        </div>
+
+        <!-- Prebuilt agent catalog -->
+        <div id="collab-prebuilt-agents" class="collab-agents-panel hidden">
+          <button type="button" class="collab-back-btn" id="collab-prebuilt-back">← Back to your agents</button>
+          <div class="collab-agents-header">
+            <div class="collab-agents-header-text">
+              <p class="page-eyebrow">Agent library</p>
+              <h2>Add a prebuilt agent</h2>
+              <p class="subtitle">Browse ready-made specialists and add them to your workspace.</p>
+            </div>
+          </div>
+          <div class="prebuilt-search-wrap card">
+            <label class="sr-only" for="collab-prebuilt-search">Search agents</label>
+            <input type="search" id="collab-prebuilt-search" class="prebuilt-search-input" placeholder="Search by name, role, skill, or industry…" autocomplete="off">
+          </div>
+          <div id="collab-prebuilt-empty" class="empty-state card hidden">
+            <div class="empty-icon">🔍</div>
+            <h3>No matches</h3>
+            <p>Try a different search term or clear the search bar.</p>
+          </div>
+          <div id="collab-prebuilt-grid" class="prebuilt-grid"></div>
+        </div>
+
+        <!-- Agent detail -->
+        <div id="collab-agent-detail" class="collab-agents-panel hidden">
+          <div id="collab-agent-detail-content"></div>
+        </div>
+
+        <!-- Active thread / project -->
+        <div id="collab-thread-view" class="collab-thread-view hidden">
+          <header class="collab-thread-header">
+            <div id="collab-thread-title" class="collab-thread-breadcrumb"></div>
+            <div class="collab-thread-actions">
+              <button type="button" class="collab-header-icon-btn hidden" id="collab-project-drawer-toggle" title="Project details" aria-label="Project details">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 5.5h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><path d="M9 9.5h6M9 12.5h4.5M9 15.5h5.5"/></svg>
+              </button>
+              <button type="button" class="collab-header-outline-btn hidden" id="collab-agent-drawer-toggle">Agent details</button>
+              <div id="collab-thread-chat-menu" class="chat-menu resume-menu hidden">
+                <button type="button" class="resume-menu-trigger chat-menu-trigger" id="collab-thread-menu-trigger" aria-label="Chat options">⋮</button>
+                <div class="resume-menu-dropdown hidden">
+                  <button type="button" id="collab-thread-export">Export chat</button>
+                  <button type="button" id="collab-thread-delete" class="danger">Delete chat</button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div id="collab-project-empty" class="collab-project-empty hidden">
+            <span class="collab-project-empty-icon" aria-hidden="true">📁</span>
+            <h2>Start a conversation in this project</h2>
+            <p>Projects keep instructions, files, and agent chats in one place.</p>
+            <div class="collab-project-empty-chips">
+              <button type="button" class="collab-chip" id="collab-project-chip-ask">Ask a question</button>
+              <button type="button" class="collab-chip" id="collab-project-chip-task">Get help with a task</button>
+            </div>
+          </div>
+
+          <div id="collab-messages" class="workspace-messages"></div>
+
+          <div id="collab-composer" class="workspace-composer">
+            <div id="collab-file-chip" class="workspace-file-chip hidden"></div>
+            <div id="collab-mention-menu" class="workspace-mention-menu hidden" role="listbox" aria-label="Mention an agent"></div>
+            <div class="workspace-composer-row">
+              <button type="button" class="workspace-icon-btn" id="collab-attach-btn" title="Attach file">📎</button>
+              <textarea id="collab-input" rows="1" placeholder="Message… (@ to mention an agent)"></textarea>
+              <button type="button" class="btn btn-primary workspace-send-btn" id="collab-send-btn" disabled aria-label="Send message">
+                <span class="workspace-send-label">Send</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <aside id="collab-project-drawer" class="collab-side-drawer hidden" aria-label="Project details">
+        <header class="collab-side-drawer-header">
+          <h3 id="collab-project-column-name">Project</h3>
+          <div class="collab-side-drawer-actions">
+            <button type="button" class="collab-icon-btn" id="collab-project-menu-btn" title="Edit project">⋮</button>
+            <button type="button" class="collab-icon-btn" id="collab-project-drawer-close" title="Close">×</button>
+          </div>
+        </header>
+        <div class="collab-side-drawer-body collab-project-column-body">
+          <section class="collab-project-card">
+            <h4>Instructions</h4>
+            <textarea id="collab-project-instructions" class="collab-project-instructions" rows="4" placeholder="Set up instructions for agents in this project…"></textarea>
+            <p id="collab-project-instructions-status" class="collab-project-save-status hidden"></p>
+          </section>
+          <section class="collab-project-card">
+            <h4>Sources</h4>
+            <div class="collab-project-connectors">
+              <div class="collab-project-source-row disabled">
+                <span>Connectors</span>
+                <span class="collab-source-meta">Coming soon</span>
+              </div>
+            </div>
+            <div id="collab-project-files" class="collab-project-files"></div>
+            <button type="button" class="collab-link-btn" id="collab-add-project-file">+ Add context file</button>
+          </section>
+          <section class="collab-project-card">
+            <div class="collab-project-card-header">
+              <h4>Agents</h4>
+              <button type="button" class="collab-link-btn" id="collab-add-project-agent">+ Add</button>
+            </div>
+            <div id="collab-project-agents" class="collab-project-agents-list"></div>
+          </section>
+          <section class="collab-project-card collab-project-feedback">
+            <h4>Feedback</h4>
+            <p class="collab-project-hint">Help the selected agent improve — share what worked or what to change.</p>
+            <textarea id="collab-project-feedback-input" class="collab-project-feedback-input" rows="3" placeholder="e.g. Be more concise in summaries…"></textarea>
+            <button type="button" class="btn btn-primary btn-sm" id="collab-project-feedback-send">Send feedback</button>
+            <p id="collab-project-feedback-status" class="collab-feedback-status hidden"></p>
+            <div id="collab-project-feedback-recent" class="collab-feedback-recent"></div>
+          </section>
+        </div>
+      </aside>
+
+      <aside id="collab-agent-drawer" class="collab-side-drawer hidden" aria-label="Agent details">
+        <header class="collab-side-drawer-header">
+          <h3 id="collab-agent-drawer-title">Agent details</h3>
+          <button type="button" class="collab-icon-btn" id="collab-agent-drawer-close" title="Close">×</button>
+        </header>
+        <div class="collab-side-drawer-body">
+          <section class="collab-drawer-section">
+            <h4>Skills</h4>
+            <p class="collab-drawer-hint">Up to 8 skills. Adding or removing skills rebuilds the agent framework.</p>
+            <div id="collab-agent-drawer-skills" class="collab-agent-drawer-skills"></div>
+            <div class="collab-agent-skill-add">
+              <input type="text" id="collab-agent-skill-input" class="collab-agent-skill-input" placeholder="Add a skill…" maxlength="80" aria-label="New skill">
+              <button type="button" class="btn btn-secondary btn-sm" id="collab-agent-skill-add-btn">Add</button>
+            </div>
+            <p id="collab-agent-skills-status" class="collab-drawer-save-status hidden"></p>
+          </section>
+          <section class="collab-drawer-section">
+            <div class="collab-memory-header">
+              <h4>Memory</h4>
+              <span id="collab-memory-status" class="collab-memory-status"></span>
+            </div>
+            <p class="collab-memory-hint">Long-term topics and summaries for this chat thread.</p>
+            <div id="collab-memory-topics" class="collab-memory-topics"></div>
+            <details id="collab-memory-summary-wrap" class="collab-memory-summary-wrap hidden">
+              <summary>Long-term summary</summary>
+              <div id="collab-memory-summary" class="collab-memory-summary"></div>
+            </details>
+          </section>
+          <section class="collab-drawer-section">
+            <h4>Communication style</h4>
+            <p class="collab-drawer-hint">How this agent should write and respond in chat.</p>
+            <select id="collab-agent-communication-style" class="collab-agent-style-select" aria-label="Communication style">
+              <option value="concise">Concise</option>
+              <option value="professional">Professional</option>
+              <option value="detailed">Detailed</option>
+              <option value="direct">Direct</option>
+              <option value="friendly">Friendly</option>
+              <option value="collaborative">Collaborative</option>
+            </select>
+            <p id="collab-agent-style-status" class="collab-drawer-save-status hidden"></p>
+          </section>
+          <section class="collab-drawer-section collab-agent-feedback-section">
+            <h4>Agent feedback</h4>
+            <p class="collab-drawer-hint">Share what worked or what to change — approved feedback shapes future replies.</p>
+            <textarea id="collab-agent-feedback-input" class="collab-project-feedback-input" rows="3" placeholder="e.g. Be more concise in summaries…"></textarea>
+            <button type="button" class="btn btn-primary btn-sm" id="collab-agent-feedback-send">Send feedback</button>
+            <p id="collab-agent-feedback-status" class="collab-feedback-status hidden"></p>
+            <div id="collab-agent-feedback-recent" class="collab-feedback-recent"></div>
+          </section>
+        </div>
+      </aside>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Legacy profile targets (off-screen, for app.js) -->
+  <div class="collab-legacy-hidden" id="home-profile-view" aria-hidden="true"><dl id="home-profile-details"></dl></div>
+  <div class="collab-legacy-hidden" id="home-profile-edit" aria-hidden="true">
+    <div id="home-edit-error"></div>
+    <form id="home-profile-form">
+      <input type="text" id="edit-name"><input type="text" id="edit-job"><input type="text" id="edit-field">
+      <input type="text" id="edit-industry"><textarea id="edit-skillset"></textarea>
+      <input type="file" id="edit-resume-file"><input type="file" id="edit-resume-replace-input">
+      <button type="submit">Save</button><button type="button" id="home-cancel-edit">Cancel</button>
+    </form>
+  </div>
+  <div id="personas-list" class="collab-legacy-hidden" aria-hidden="true"></div>
+  <div id="personas-empty" class="collab-legacy-hidden" aria-hidden="true"></div>
+
+  <!-- Landing -->
+  <div data-view="landing" class="landing-page">
+    <section class="landing-hero">
+      <div class="landing-hero-inner">
+        <div class="landing-hero-left">
+          <h1 class="landing-headline">Same AI.<br>But better.</h1>
+          <p class="landing-subhead">Customize your AI with your skills, tone, and expertise — and build the best version of AI for yourself.</p>
+
+          <div class="auth-card" id="landing-auth-card">
+            <div class="auth-card-banner">Train your first agent free — no credit card required.</div>
+            <p id="landing-auth-dev-hint" class="login-dev-hint hidden"></p>
+            <div id="landing-auth-error"></div>
+            <form id="landing-auth-form">
+              <div class="form-group form-group-compact">
+                <input type="email" id="landing-auth-email" required placeholder="Enter your email" autocomplete="email">
+              </div>
+              <div class="form-group form-group-compact" id="landing-auth-password-wrap">
+                <input type="password" id="landing-auth-password" required placeholder="Password" autocomplete="current-password">
+              </div>
+              <button type="submit" class="btn btn-primary btn-block" id="landing-auth-submit">Continue with email</button>
+            </form>
+            <p class="auth-card-footer">
+              <span id="landing-auth-toggle-text">Don't have an account?</span>
+              <button type="button" class="auth-link-btn" id="landing-auth-toggle">Sign up</button>
+            </p>
+            <p class="auth-card-legal">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
+          </div>
+        </div>
+
+        <div class="landing-hero-media" aria-hidden="true">
+          <div class="hero-media-frame">
+            <div class="hero-media-visual">
+              <div class="hero-media-bg"></div>
+              <div class="hero-media-grid"></div>
+              <div class="hero-agent-core">✦</div>
+              <div class="hero-agent-node hero-agent-node-1"><span>Research</span></div>
+              <div class="hero-agent-node hero-agent-node-2"><span>Analysis</span></div>
+              <div class="hero-agent-node hero-agent-node-3"><span>Writing</span></div>
+              <div class="hero-agent-node hero-agent-node-4"><span>Review</span></div>
+              <svg class="hero-agent-lines" viewBox="0 0 400 400" fill="none">
+                <line class="hero-line hero-line-1" x1="200" y1="200" x2="120" y2="100" />
+                <line class="hero-line hero-line-2" x1="200" y1="200" x2="300" y2="110" />
+                <line class="hero-line hero-line-3" x1="200" y1="200" x2="310" y2="260" />
+                <line class="hero-line hero-line-4" x1="200" y1="200" x2="100" y2="270" />
+              </svg>
+              <div class="hero-media-particles">
+                <span></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-how" id="how-it-works">
+      <div class="landing-container-wide">
+        <p class="section-eyebrow">How it works</p>
+        <h2 class="section-heading">Get started in minutes</h2>
+        <p class="section-lead">Five steps to create your AI agent — name it, set its role, pick skills, and start working.</p>
+        <div class="how-cards">
+          <article class="how-card">
+            <div class="how-card-visual">
+              <div class="how-mock-name">
+                <span class="how-mock-name-label">Agent name</span>
+                <span class="how-mock-name-value">Sara</span>
+              </div>
+            </div>
+            <div class="how-card-body">
+              <span class="how-card-num">1</span>
+              <h3>Name it</h3>
+              <p>Give your agent a name — this is how it appears in your workspace.</p>
+            </div>
+          </article>
+          <article class="how-card">
+            <div class="how-card-visual how-card-visual-yellow">
+              <div class="how-mock-wizard">
+                <div class="how-mock-tags">
+                  <span>Senior Analyst</span><span>Healthcare</span>
+                </div>
+              </div>
+            </div>
+            <div class="how-card-body">
+              <span class="how-card-num">2</span>
+              <h3>Role &amp; industry</h3>
+              <p>Set the job title and industry so your agent understands your context.</p>
+            </div>
+          </article>
+          <article class="how-card">
+            <div class="how-card-visual">
+              <div class="how-mock-tags how-mock-tags-center">
+                <span>SQL</span><span>Python</span><span>Tableau</span>
+              </div>
+            </div>
+            <div class="how-card-body">
+              <span class="how-card-num">3</span>
+              <h3>Pick skills</h3>
+              <p>Choose up to 8 skills that define what your agent is great at.</p>
+            </div>
+          </article>
+          <article class="how-card">
+            <div class="how-card-visual how-card-visual-yellow">
+              <div class="how-mock-create">
+                <div class="how-mock-create-bar"><span style="width:85%"></span></div>
+                <span class="how-mock-create-label">Building framework… 85%</span>
+              </div>
+            </div>
+            <div class="how-card-body">
+              <span class="how-card-num">4</span>
+              <h3>Create</h3>
+              <p>Minion generates your agent profile and multi-agent framework.</p>
+            </div>
+          </article>
+          <article class="how-card">
+            <div class="how-card-visual">
+              <div class="how-mock-chat">
+                <div class="how-mock-chat-bubble">Found 3 drop-off segments. Draft summary ready.</div>
+                <div class="how-mock-chat-from">Sara · your agent</div>
+              </div>
+            </div>
+            <div class="how-card-body">
+              <span class="how-card-num">5</span>
+              <h3>Start working</h3>
+              <p>Chat with your agent team — one voice, multiple specialists behind it.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-features" id="examples">
+      <div class="landing-container-wide">
+        <article class="feature-showcase">
+          <div class="feature-showcase-text">
+            <p class="feature-label">Create your agent</p>
+            <h3><span class="feature-icon" aria-hidden="true">✦</span> Five steps to your personal AI agent.</h3>
+            <p>Name it, give it a role and industry, pick the skills, and create — Minion builds an agent customized to how you work, with your tone and expertise baked in.</p>
+          </div>
+          <div class="feature-showcase-visual feature-visual-blue">
+            <div class="feature-prompt">Create an agent named Sara for healthcare data analysis</div>
+            <div class="feature-result-card">
+              <div class="feature-result-header">
+                <span class="feature-result-icon">✦</span>
+                <span class="feature-result-title">Agent created</span>
+              </div>
+              <div class="feature-result-steps">
+                <span class="done">✓ Named</span>
+                <span class="done">✓ Role &amp; industry</span>
+                <span class="done">✓ Skills picked</span>
+                <span class="active">Creating framework…</span>
+              </div>
+              <span class="feature-badge">Created by Minion</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-showcase feature-showcase-reverse">
+          <div class="feature-showcase-text">
+            <p class="feature-label">Multi-agent framework</p>
+            <h3><span class="feature-icon" aria-hidden="true">✦</span> Specialist roles that work together like your team.</h3>
+            <p>From your setup, Minion scaffolds an orchestrator and specialist agents — investigator, SQL analyst, interpreter, and communicator — routed the way you delegate.</p>
+          </div>
+          <div class="feature-showcase-visual feature-visual-yellow">
+            <div class="feature-prompt">Generate my agent framework</div>
+            <div class="feature-result-card">
+              <div class="feature-result-header">
+                <span class="feature-result-icon">✦</span>
+                <span class="feature-result-title">Framework ready</span>
+              </div>
+              <div class="feature-result-agents">
+                <span>Investigator</span>
+                <span>SQL Analyst</span>
+                <span>Interpreter</span>
+                <span>Communicator</span>
+              </div>
+              <div class="feature-result-meta">4 specialists · 1 orchestrator · style profile included</div>
+              <span class="feature-badge">Built by Minion</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-showcase">
+          <div class="feature-showcase-text">
+            <p class="feature-label">Chat workspace</p>
+            <h3><span class="feature-icon" aria-hidden="true">✦</span> Complex work handled through your trained agent team.</h3>
+            <p>Ask your agent to analyze data, draft stakeholder updates, or run multi-step investigations. Sub-agents collaborate behind one voice — you get a single, coherent reply.</p>
+          </div>
+          <div class="feature-showcase-visual feature-visual-blue">
+            <div class="feature-prompt">@Sara analyze the migration funnel and find drop-off segments</div>
+            <div class="feature-result-card">
+              <div class="feature-result-header">
+                <span class="feature-result-icon">✦</span>
+                <span class="feature-result-title">Analysis complete</span>
+              </div>
+              <div class="feature-result-body">
+                <div class="feature-result-highlight">3 segments flagged in onboarding step 2</div>
+                <p>Enterprise users stall at integration setup. Summary deck drafted with recommended follow-ups.</p>
+              </div>
+              <div class="feature-result-progress">
+                <span class="done">SQL ✓</span>
+                <span class="done">Stats ✓</span>
+                <span class="done">Draft ✓</span>
+              </div>
+              <span class="feature-badge">Replied by Sara</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-testimonials" id="testimonials">
+      <div class="landing-container-wide">
+        <div class="testimonial-row">
+          <blockquote class="testimonial-item">
+            <p>"Minion captured how I approach data problems — my agent drafts analyses the way I would."</p>
+            <footer><strong>Sarah Chen</strong> · Senior Data Analyst</footer>
+          </blockquote>
+          <blockquote class="testimonial-item">
+            <p>"Five minutes to set up, and my framework handles research, SQL, and exec comms as one pipeline."</p>
+            <footer><strong>Marcus Rivera</strong> · Product Analytics Lead</footer>
+          </blockquote>
+          <blockquote class="testimonial-item">
+            <p>"I deployed in two days. @mentioning my agent for funnel analysis saves hours every week."</p>
+            <footer><strong>Priya Okonkwo</strong> · ML Engineer</footer>
+          </blockquote>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-footer landing-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">Minion AI</div>
+        <div class="footer-links">
+          <button type="button" class="footer-link" id="show-login-footer">Log in</button>
+          <button type="button" class="footer-link" id="show-register-footer">Get started</button>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Login -->
+  <div data-view="login" class="hidden">
+    <div class="auth-split">
+      <div class="auth-split-left">
+        <div class="auth-split-form">
+          <div class="logo auth-logo">
+            <div class="logo-icon">✦</div>
+            Minion AI
+          </div>
+          <h2>Welcome back</h2>
+          <p class="subtitle">Log in to continue training your agent.</p>
+          <p id="login-dev-hint" class="login-dev-hint hidden"></p>
+          <div id="login-error"></div>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email">Email</label>
+              <input type="email" id="login-email" required placeholder="Enter your email" autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label for="login-password">Password</label>
+              <input type="password" id="login-password" required placeholder="Password" autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Continue with email</button>
+          </form>
+          <p class="auth-card-footer">
+            <button type="button" class="auth-link-btn" id="show-forgot-password">Forgot password?</button>
+          </p>
+          <p class="auth-card-footer">
+            Don't have an account?
+            <button type="button" class="auth-link-btn" id="auth-go-register">Sign up</button>
+          </p>
+        </div>
+      </div>
+      <div class="auth-split-right" aria-hidden="true">
+        <div class="auth-visual">
+          <div class="auth-visual-content">
+            <h3>Your expertise.<br>One AI agent.</h3>
+            <p>Assess. Train. Deploy.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forgot password -->
+  <div data-view="forgot-password" class="hidden">
+    <div class="auth-split">
+      <div class="auth-split-left">
+        <div class="auth-split-form">
+          <div class="logo auth-logo">
+            <div class="logo-icon">✦</div>
+            Minion AI
+          </div>
+          <h2>Reset password</h2>
+          <p class="subtitle">Enter your email and we’ll send a reset link.</p>
+          <div id="forgot-password-error"></div>
+          <div id="forgot-password-success"></div>
+          <form id="forgot-password-form">
+            <div class="form-group">
+              <label for="forgot-email">Email</label>
+              <input type="email" id="forgot-email" required placeholder="Enter your email" autocomplete="email">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Send reset link</button>
+          </form>
+          <p class="auth-card-footer">
+            <button type="button" class="auth-link-btn" id="back-to-login">Back to log in</button>
+          </p>
+        </div>
+      </div>
+      <div class="auth-split-right" aria-hidden="true">
+        <div class="auth-visual">
+          <div class="auth-visual-content">
+            <h3>Your expertise.<br>One AI agent.</h3>
+            <p>Assess. Train. Deploy.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register -->
+  <div data-view="register" class="hidden">
+    <div class="auth-split">
+      <div class="auth-split-left">
+        <div class="auth-split-form">
+          <div class="logo auth-logo">
+            <div class="logo-icon">✦</div>
+            Minion AI
+          </div>
+          <h2>Create your account</h2>
+          <p class="subtitle">Sign up free, then personalize your first agent.</p>
+          <div id="register-error"></div>
+          <form id="register-form">
+            <div class="form-group">
+              <label for="register-email">Email</label>
+              <input type="email" id="register-email" required placeholder="Enter your email" autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label for="register-password">Password</label>
+              <input type="password" id="register-password" required minlength="8" placeholder="At least 8 characters" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Create account</button>
+          </form>
+          <p class="auth-card-footer">
+            Already have an account?
+            <button type="button" class="auth-link-btn" id="auth-go-login">Log in</button>
+          </p>
+        </div>
+      </div>
+      <div class="auth-split-right" aria-hidden="true">
+        <div class="auth-visual">
+          <div class="auth-visual-content">
+            <h3>Train an agent<br>that thinks like you.</h3>
+            <p>Start your Studio assessment in minutes.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Background wizard -->
+  <div data-view="background" class="hidden">
+    <div class="wizard-shell">
+      <div class="wizard-top">
+        <button type="button" class="wizard-back hidden" id="bg-back" aria-label="Back">←</button>
+        <div class="wizard-progress-track">
+          <div class="wizard-progress-fill" id="bg-progress"></div>
+        </div>
+      </div>
+
+      <div class="wizard-card card">
+        <div id="background-error"></div>
+        <h2 class="wizard-title" id="bg-step-title">Your background</h2>
+        <p class="wizard-subtitle" id="bg-step-subtitle"></p>
+
+        <div id="bg-step-body" class="wizard-body"></div>
+
+        <div id="bg-field-custom-wrap" class="form-group hidden">
+          <label for="bg-field-custom">Describe your field</label>
+          <input type="text" id="bg-field-custom" placeholder="e.g. Legal Operations, Supply Chain">
+        </div>
+
+        <div id="bg-industry-custom-wrap" class="form-group hidden">
+          <label for="bg-industry-custom">Your industry</label>
+          <input type="text" id="bg-industry-custom" placeholder="e.g. Aerospace, Agriculture">
+        </div>
+
+        <div id="bg-role-custom-wrap" class="form-group hidden">
+          <label for="bg-role-custom">Job title</label>
+          <input type="text" id="bg-role-custom" placeholder="e.g. Revenue Operations Lead">
+        </div>
+
+        <div id="bg-skills-custom-wrap" class="form-group hidden">
+          <label for="bg-skill-custom-input">Add custom skills</label>
+          <div class="skill-tag-input-row">
+            <input type="text" id="bg-skill-custom-input" placeholder="Type a skill and press Add">
+            <button type="button" class="btn btn-secondary btn-sm" id="bg-skill-add-btn">Add</button>
+          </div>
+          <div id="bg-custom-skills-tags" class="skill-tags"></div>
+        </div>
+
+        <div id="bg-name-wrap" class="wizard-name-wrap form-group hidden">
+          <label for="bg-name-input">Agent name</label>
+          <input type="text" id="bg-name-input" placeholder="e.g. Data Analyst Pro" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="wizard-footer">
+        <button type="button" class="btn btn-primary btn-block" id="bg-next">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Studio Intro -->
+  <div data-view="studio-intro" class="hidden">
+    <div class="container-studio">
+      <div class="card">
+        <p class="page-eyebrow">Step 2 of 3 · Studio Assessment</p>
+        <h2 id="studio-name">Studio</h2>
+        <p class="subtitle" id="studio-desc"></p>
+
+        <div class="studio-stats">
+          <div class="studio-stat">
+            <strong id="studio-task-count">5</strong>
+            <span>work tasks</span>
+          </div>
+          <div class="studio-stat">
+            <strong id="studio-time">~25</strong>
+            <span>minutes</span>
+          </div>
+          <div class="studio-stat">
+            <strong>1</strong>
+            <span>task to create agent</span>
+          </div>
+        </div>
+
+        <p style="color:var(--muted);margin-bottom:1rem;font-size:0.95rem;line-height:1.7">
+          Structured like a take-home assessment. Complete each task as you would at work —
+          your responses teach us how you investigate, analyze, and communicate.
+        </p>
+        <ul class="studio-intro-steps">
+          <li>Investigation scenarios</li>
+          <li>Technical challenges (SQL, analysis)</li>
+          <li>Interpretation and stakeholder communication</li>
+          <li>Methodology decisions</li>
+        </ul>
+        <div id="studio-intro-error"></div>
+        <button class="btn btn-gradient btn-block" id="start-studio-btn">Enter Studio</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Studio Tasks -->
+  <div data-view="studio" class="hidden">
+    <div class="container-studio">
+      <div class="studio-header">
+        <div class="studio-meta">
+          <span class="studio-badge">◈ Studio Assessment</span>
+          <span class="timer" id="task-timer">0:00</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="studio-progress-fill" style="width:0%"></div>
+        </div>
+        <p id="studio-progress-label" style="color:var(--muted);font-size:0.85rem">Task 1 of 5</p>
+        <div class="step-indicator" id="step-dots"></div>
+      </div>
+
+      <div class="card">
+        <h2 id="task-title">Task</h2>
+        <div class="task-prompt" id="task-prompt"></div>
+        <div class="task-prompt hidden">
+          <strong>Schema</strong>
+          <pre class="schema-block" id="task-schema"></pre>
+        </div>
+        <p style="color:var(--muted);margin-bottom:1.25rem;line-height:1.6" id="task-instructions"></p>
+        <div id="task-error"></div>
+        <form id="task-submit-form">
+          <div id="task-form-fields"></div>
+          <button type="submit" class="btn btn-primary btn-block">Submit task</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div data-view="results" class="hidden">
+    <div class="container-studio">
+      <div class="card">
+        <div class="results-hero">
+          <div class="results-icon">✦</div>
+          <p class="page-eyebrow">Step 3 of 3</p>
+          <h2>Your agent is ready</h2>
+          <p class="subtitle" id="results-subtitle">
+            We generated an agent profile and multi-agent framework from your Studio assessment —
+            capturing how you work, not just what you know.
+          </p>
+        </div>
+
+        <div class="alert alert-success" id="results-alert">
+          Your agent has been created. Download your artifacts below.
+        </div>
+
+        <div class="training-progress-card">
+          <span>Training progress</span>
+          <strong id="training-progress">—</strong>
+        </div>
+
+        <button class="btn btn-gradient btn-block hidden" id="continue-training-btn" style="margin-bottom:1.5rem">
+          Continue training your agent
+        </button>
+
+        <ul class="artifact-list" id="artifact-list"></ul>
+
+        <div id="artifact-preview-panel" class="hidden">
+          <h3 style="margin-top:1.5rem;margin-bottom:0.5rem;font-size:0.95rem;font-weight:700">Preview</h3>
+          <div class="artifact-preview" id="artifact-preview"></div>
+        </div>
+
+        <button class="btn btn-secondary btn-block" id="go-home" style="margin-top:1rem">
+          Back to home
+        </button>
+        <button class="btn btn-secondary btn-block" id="go-billing" style="margin-top:0.75rem">
+          Choose a plan — from $10/mo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plans / subscription -->
+  <div data-view="plans" class="hidden">
+    <div class="container-plans">
+      <div class="plans-header">
+        <p class="page-eyebrow">Subscription</p>
+        <h2>Choose your plan</h2>
+        <p class="subtitle">Each plan includes a monthly API token allowance equal to 60% of the subscription price.</p>
+      </div>
+      <div id="plans-error"></div>
+      <div id="plans-message"></div>
+      <div id="plans-usage" class="plans-usage hidden"></div>
+      <div id="plans-grid" class="plans-grid"></div>
+      <div class="plans-footer">
+        <button type="button" class="btn btn-secondary" id="plans-go-home">Back to home</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-view="plans/success" class="hidden">
+    <div class="container-narrow">
+      <div class="card card-centered" style="text-align:center">
+        <div class="results-icon" style="margin-bottom:1rem">✓</div>
+        <h2>You're subscribed</h2>
+        <p class="subtitle">Your plan is active. You can start using your agents right away.</p>
+        <button type="button" class="btn btn-primary btn-block" id="plans-success-continue" style="margin-top:1.5rem">Go to workspace</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="collab-file-input" accept=".csv,.txt,.md,.pdf,.docx,.xlsx,.xls" class="hidden">
+  <input type="file" id="collab-project-file-input" accept=".csv,.txt,.md,.pdf,.docx,.xlsx,.xls" class="hidden">
+  <input type="file" id="collab-agent-context-file" accept=".csv,.txt,.md,.pdf,.docx,.xlsx,.xls" class="hidden">
+
+  <!-- New / edit project modal -->
+  <div id="project-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="project-modal-backdrop"></div>
+    <div class="modal-dialog modal-dialog-compact project-create-modal" role="dialog" aria-labelledby="project-modal-title">
+      <div class="modal-header project-modal-header">
+        <h3 id="project-modal-title">Create a project</h3>
+        <button type="button" class="modal-close project-modal-close" id="project-modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body project-modal-body">
+        <input type="hidden" id="project-edit-id" value="">
+        <div class="project-modal-field">
+          <label class="project-modal-label" for="project-name">What are you working on?</label>
+          <input type="text" id="project-name" class="project-modal-input" placeholder="Name your project" autocomplete="off">
+        </div>
+        <div class="project-modal-field">
+          <label class="project-modal-label" for="project-desc">What are you trying to achieve?</label>
+          <textarea id="project-desc" class="project-modal-textarea" rows="3" placeholder="Describe your project, goals, subject, etc…"></textarea>
+        </div>
+        <div class="project-modal-field" id="project-agent-picks-wrap">
+          <label class="project-modal-label" for="project-agent-multiselect-trigger">Add agents to this project</label>
+          <div class="project-agent-multiselect" id="project-agent-multiselect">
+            <button type="button" class="project-agent-multiselect-trigger" id="project-agent-multiselect-trigger" aria-haspopup="listbox" aria-expanded="false">
+              <span class="project-agent-multiselect-chips" id="project-agent-chips"></span>
+              <span class="project-agent-multiselect-placeholder" id="project-agent-placeholder">Select agents…</span>
+              <span class="project-agent-multiselect-chevron" aria-hidden="true">▾</span>
+            </button>
+            <div class="project-agent-multiselect-menu hidden" id="project-agent-multiselect-menu" role="listbox" aria-multiselectable="true"></div>
+          </div>
+          <button type="button" class="project-agent-browse-prebuilt" id="project-agent-browse-prebuilt">Browse prebuilt agents</button>
+        </div>
+        <p id="project-modal-error" class="alert alert-error hidden"></p>
+      </div>
+      <div class="modal-footer project-modal-footer">
+        <button type="button" class="btn btn-secondary project-modal-cancel-btn hidden" id="project-modal-delete">Delete project</button>
+        <button type="button" class="btn btn-secondary project-modal-cancel-btn" id="project-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-dark project-modal-primary-btn" id="project-modal-save">Create project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add agent to project modal -->
+  <div id="project-agent-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="project-agent-modal-backdrop"></div>
+    <div class="modal-dialog modal-dialog-sm" role="dialog">
+      <div class="modal-header">
+        <h3>Add agent to project</h3>
+        <button type="button" class="modal-close" id="project-agent-modal-close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-hint">Choose an existing agent or create a new one.</p>
+        <div id="project-add-agent-picks" class="project-agent-picks"></div>
+        <button type="button" class="btn btn-secondary btn-sm" id="project-add-agent-create" style="margin-top:0.75rem">Create new agent</button>
+        <p id="project-agent-modal-error" class="alert alert-error hidden"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="project-agent-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="project-agent-modal-save">Add to project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Group chat modal -->
+  <div id="group-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="group-modal-backdrop"></div>
+    <div class="modal-dialog modal-dialog-sm" role="dialog">
+      <div class="modal-header">
+        <h3>New group chat</h3>
+        <button type="button" class="modal-close" id="group-modal-close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-hint">Select 2 or more agents to collaborate in one thread.</p>
+        <div id="group-agent-picks" class="project-agent-picks"></div>
+        <p id="group-modal-error" class="alert alert-error hidden"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="group-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="group-modal-save">Start group chat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account modal -->
+  <div id="account-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="account-modal-backdrop"></div>
+    <div class="modal-dialog modal-dialog-sm" role="dialog" aria-labelledby="account-modal-title">
+      <div class="modal-header">
+        <h3 id="account-modal-title">Account</h3>
+        <button type="button" class="modal-close" id="account-modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body" id="account-modal-body"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="account-modal-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legacy profile modal (hidden, kept for compatibility) -->
+  <div id="profile-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="profile-modal-backdrop"></div>
+    <div class="modal-dialog" role="dialog">
+      <div class="modal-header">
+        <h3>Your profile</h3>
+        <button type="button" class="modal-close" id="profile-modal-close">×</button>
+      </div>
+      <div class="modal-body" id="profile-modal-body"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="profile-modal-edit">Edit profile</button>
+        <button type="button" class="btn btn-primary hidden" id="profile-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent rename modal -->
+  <div id="agent-rename-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="agent-rename-backdrop"></div>
+    <div class="modal-dialog modal-dialog-sm" role="dialog" aria-labelledby="agent-rename-title">
+      <div class="modal-header">
+        <h3 id="agent-rename-title">Rename agent</h3>
+        <button type="button" class="modal-close" id="agent-rename-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <label for="agent-rename-input" class="modal-label">Agent name</label>
+        <input type="text" id="agent-rename-input" class="modal-input" placeholder="Agent name" autocomplete="off">
+        <p id="agent-rename-error" class="alert alert-error hidden"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="agent-rename-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="agent-rename-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent delete confirmation modal -->
+  <div id="agent-delete-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="agent-delete-backdrop"></div>
+    <div class="modal-dialog modal-dialog-sm" role="dialog" aria-labelledby="agent-delete-title">
+      <div class="modal-header">
+        <h3 id="agent-delete-title">Delete agent?</h3>
+        <button type="button" class="modal-close" id="agent-delete-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-warning" id="agent-delete-body">
+          This will permanently delete <strong id="agent-delete-name"></strong> and all associated
+          artifacts (profile, skills, framework). This action cannot be undone.
+        </p>
+        <p id="agent-delete-error" class="alert alert-error hidden"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="agent-delete-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="agent-delete-confirm">Delete permanently</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resume preview modal (must be before app.js so close handlers bind) -->
+  <div id="resume-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" id="resume-modal-backdrop"></div>
+    <div class="modal-dialog" role="dialog" aria-labelledby="resume-modal-title">
+      <div class="modal-header">
+        <h3 id="resume-modal-title">Resume</h3>
+        <button type="button" class="modal-close" id="resume-modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <iframe id="resume-modal-frame" class="resume-modal-frame hidden" title="Resume preview"></iframe>
+        <div id="resume-modal-fallback" class="resume-modal-fallback hidden">
+          <p>Preview isn't available for this file type in the browser.</p>
+          <p class="file-hint">Upload a PDF or HTML resume to preview here.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="home-resume-replace-input" accept=".pdf,.docx,.html,.htm" class="hidden">
+
+  <script src="/js/vendor/marked.min.js"></script>
+  <script src="/js/vendor/purify.min.js"></script>
+  <script src="/js/vendor/mermaid.min.js"></script>
+  <script src="/js/markdown.js?v=1"></script>
+  <script src="/js/background-wizard.js?v=17"></script>
+  <script src="/js/chat-workspace.js?v=50"></script>
+  <script src="/js/app.js?v=23"></script>
+</body>
+</html>
