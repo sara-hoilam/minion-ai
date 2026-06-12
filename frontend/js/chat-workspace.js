@@ -111,7 +111,6 @@ const ChatWorkspace = (() => {
       hidden_from_roster: !!a.hidden_from_roster,
     }));
     renderSidebar();
-    updateWelcomeAgentSelect();
     try {
       await loadProjects();
     } catch (_) {}
@@ -819,19 +818,6 @@ const ChatWorkspace = (() => {
     });
   }
 
-  function updateWelcomeAgentSelect() {
-    const sel = $("collab-welcome-agent");
-    if (!sel) return;
-    if (agents.length <= 1) {
-      sel.classList.add("hidden");
-      return;
-    }
-    sel.classList.remove("hidden");
-    sel.innerHTML = agents.map((a) =>
-      `<option value="${a.session_id}">${escapeHtml(a.name)}</option>`
-    ).join("");
-  }
-
   function stopThreadPoll() {
     if (threadPollTimer) {
       clearTimeout(threadPollTimer);
@@ -1101,6 +1087,7 @@ const ChatWorkspace = (() => {
 
   function applyLoadedThread(thread) {
     currentThread = thread;
+    showProjectEmptyState(false);
     stopThreadPoll();
     renderMessages(thread.messages || []);
     bindProgressCards($("collab-messages"));
@@ -1148,6 +1135,7 @@ const ChatWorkspace = (() => {
   function showThreadView() {
     hideAllPanels();
     $("collab-thread-view")?.classList.remove("hidden");
+    showProjectEmptyState(false);
     if (currentMode !== "project") currentMode = "thread";
     renderSidebar();
     updateThreadChatMenu();
@@ -1555,6 +1543,7 @@ const ChatWorkspace = (() => {
       updateThreadChatMenu();
       setProjectColumnVisible(false);
       closeAllDrawers();
+      document.querySelector(".collab-shell")?.classList.remove("project-open");
       showThreadView();
       setHash(`chat/agent/${sessionId}`);
 
@@ -1612,6 +1601,12 @@ const ChatWorkspace = (() => {
   async function openProject(projectId, existingThread, agentSessionId) {
     const project = await window.api(`/projects/${projectId}`);
     currentProject = project;
+
+    const projectAgents = project.agents || [];
+    if (!agentSessionId && projectAgents.length) {
+      agentSessionId = projectAgents[0].session_id;
+    }
+
     currentMode = "project";
     currentProjectAgentId = agentSessionId || null;
     hideAllPanels();
@@ -1625,7 +1620,7 @@ const ChatWorkspace = (() => {
       setHash(`project/${projectId}`);
     }
 
-    const agentInfo = (project.agents || []).find((a) => a.session_id === agentSessionId);
+    const agentInfo = projectAgents.find((a) => a.session_id === agentSessionId);
     renderThreadBreadcrumb({
       projectName: project.name,
       topic: agentInfo?.name || "Project workspace",
@@ -2158,8 +2153,7 @@ const ChatWorkspace = (() => {
     hideMentionMenu(menuEl);
 
     if (input.id === "collab-welcome-input") {
-      const sel = $("collab-welcome-agent");
-      if (sel) sel.value = String(agent.session_id);
+      updateWelcomeSendState();
     } else {
       currentAgentId = agent.session_id;
     }
@@ -2325,6 +2319,17 @@ const ChatWorkspace = (() => {
     updateSendState();
   }
 
+  function resolveWelcomeAgentSession(content) {
+    const list = agentMentionList();
+    for (const a of list) {
+      if (content.includes(`@${a.name}`)) {
+        return a.session_id;
+      }
+    }
+    if (list.length === 1) return list[0].session_id;
+    return null;
+  }
+
   async function sendMessage(textOverride, fromWelcome = false) {
     let input = fromWelcome ? $("collab-welcome-input") : $("collab-input");
     const content = (textOverride ?? input?.value ?? "").trim();
@@ -2333,19 +2338,16 @@ const ChatWorkspace = (() => {
     if (!content && !file) return;
 
     if (!currentThread) {
-      let sessionId = null;
-      const list = agentMentionList();
-      for (const a of list) {
-        if (content.includes(`@${a.name}`)) {
-          sessionId = a.session_id;
-          break;
+      const sessionId = resolveWelcomeAgentSession(content);
+      if (!sessionId) {
+        if (!agentMentionList().length) {
+          window.BackgroundWizard?.open({ mode: "new_agent", prefill: {} });
+          return;
         }
-      }
-      if (!sessionId) {
-        sessionId = parseInt($("collab-welcome-agent")?.value || agents[0]?.session_id, 10);
-      }
-      if (!sessionId) {
-        window.BackgroundWizard?.open({ mode: "new_agent", prefill: {} });
+        if (fromWelcome && $("collab-welcome-input")) {
+          $("collab-welcome-input").focus();
+          $("collab-welcome-input").placeholder = "Type @ to mention an agent…";
+        }
         return;
       }
       await openAgentDm(sessionId);
