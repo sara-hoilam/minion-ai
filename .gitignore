@@ -2,7 +2,13 @@
 __pycache__/
 *.pyc
 .env
-cursor_apikey.txt
+.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+*-credentials.json
 models.json
 agent_resp.json
 agent_body.json

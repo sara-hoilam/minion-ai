@@ -4,18 +4,14 @@ from backend.app import create_app
 from backend.services import cursor_llm
 
 
-def test_cursor_key_loads_from_file(tmp_path, monkeypatch):
-    key_file = tmp_path / "cursor_apikey.txt"
-    key_file.write_text("crsr_test_key\n", encoding="utf-8")
-    monkeypatch.delenv("CURSOR_API_KEY", raising=False)
+def test_cursor_key_loads_from_env(monkeypatch):
+    import importlib
 
-    def _load():
-        env_key = ""
-        if key_file.exists():
-            return key_file.read_text(encoding="utf-8").strip()
-        return env_key
+    import backend.config as config_mod
 
-    assert _load() == "crsr_test_key"
+    monkeypatch.setenv("CURSOR_API_KEY", "crsr_test_key")
+    importlib.reload(config_mod)
+    assert config_mod.CURSOR_API_KEY == "crsr_test_key"
 
 
 def test_build_prompt_includes_system_and_history():

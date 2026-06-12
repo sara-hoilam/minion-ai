@@ -60,20 +60,7 @@ MEMORY_TOPIC_RELEVANCE_TOP_K = int(os.getenv("MEMORY_TOPIC_RELEVANCE_TOP_K", "3"
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 
-def _load_cursor_api_key() -> str:
-    env_key = os.getenv("CURSOR_API_KEY", "").strip()
-    if env_key:
-        return env_key
-    key_file = BASE_DIR / "cursor_apikey.txt"
-    if key_file.exists():
-        try:
-            return key_file.read_text(encoding="utf-8").strip()
-        except OSError:
-            return ""
-    return ""
-
-
-CURSOR_API_KEY = _load_cursor_api_key()
+CURSOR_API_KEY = os.getenv("CURSOR_API_KEY", "").strip()
 CURSOR_API_BASE = os.getenv("CURSOR_API_BASE", "https://api.cursor.com")
 CURSOR_MODEL = os.getenv("CURSOR_MODEL", "composer-2.5")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
