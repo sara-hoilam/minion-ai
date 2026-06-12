@@ -88,7 +88,9 @@ const ChatWorkspace = (() => {
     if (current === next) return;
     suppressHashChange += 1;
     location.hash = next;
-    queueMicrotask(() => { suppressHashChange -= 1; });
+    window.addEventListener("hashchange", () => {
+      suppressHashChange = Math.max(0, suppressHashChange - 1);
+    }, { once: true });
   }
 
   function shouldHandleHashChange() {
@@ -1528,13 +1530,37 @@ const ChatWorkspace = (() => {
     renderSidebar();
   }
 
-  const navInFlight = new Set();
+  const navInFlight = new Map();
+
+  function isViewingAgentDm(sessionId) {
+    return (
+      currentAgentId === sessionId
+      && !!currentThread?.id
+      && currentMode === "thread"
+      && !currentProject
+    );
+  }
+
+  function isViewingProjectAgent(projectId, agentSessionId) {
+    return (
+      currentMode === "project"
+      && currentProject?.id === projectId
+      && currentProjectAgentId === agentSessionId
+      && !!currentThread?.id
+    );
+  }
 
   async function openAgentDm(sessionId) {
     const navKey = `agent:${sessionId}`;
-    if (navInFlight.has(navKey)) return;
-    navInFlight.add(navKey);
-    try {
+    if (isViewingAgentDm(sessionId)) {
+      showThreadView();
+      return;
+    }
+    if (navInFlight.has(navKey)) {
+      return navInFlight.get(navKey);
+    }
+
+    const task = (async () => {
       currentAgentId = sessionId;
       currentProject = null;
       currentProjectAgentId = null;
@@ -1566,6 +1592,11 @@ const ChatWorkspace = (() => {
       syncDmThreadId(sessionId, thread.id);
       applyLoadedThread(thread);
       await loadSidebar();
+    })();
+
+    navInFlight.set(navKey, task);
+    try {
+      await task;
     } finally {
       navInFlight.delete(navKey);
     }
@@ -1607,55 +1638,74 @@ const ChatWorkspace = (() => {
       agentSessionId = projectAgents[0].session_id;
     }
 
-    currentMode = "project";
-    currentProjectAgentId = agentSessionId || null;
-    hideAllPanels();
-    closeAllDrawers();
-    document.querySelector(".collab-shell")?.classList.add("project-open");
-    showThreadView();
-
-    if (agentSessionId) {
-      setHash(`project/${projectId}/agent/${agentSessionId}`);
-    } else {
-      setHash(`project/${projectId}`);
+    if (isViewingProjectAgent(projectId, agentSessionId)) {
+      showThreadView();
+      return;
     }
 
-    const agentInfo = projectAgents.find((a) => a.session_id === agentSessionId);
-    renderThreadBreadcrumb({
-      projectName: project.name,
-      topic: agentInfo?.name || "Project workspace",
-      agentName: agentInfo?.name,
-    });
+    const navKey = `project:${projectId}:${agentSessionId || "none"}`;
+    if (navInFlight.has(navKey)) {
+      return navInFlight.get(navKey);
+    }
 
-    await renderProjectPanel(project);
+    const task = (async () => {
+      currentMode = "project";
+      currentProjectAgentId = agentSessionId || null;
+      hideAllPanels();
+      closeAllDrawers();
+      document.querySelector(".collab-shell")?.classList.add("project-open");
+      showThreadView();
 
-    if (agentSessionId) {
-      showProjectEmptyState(false);
-      let thread = existingThread;
-      if (!thread) {
-        thread = await window.api("/chat/threads", {
-          method: "POST",
-          body: JSON.stringify({
-            thread_type: "project_agent",
-            project_id: projectId,
-            agent_session_id: agentSessionId,
-          }),
-        });
+      if (agentSessionId) {
+        setHash(`project/${projectId}/agent/${agentSessionId}`);
+      } else {
+        setHash(`project/${projectId}`);
       }
-      currentAgentId = agentSessionId;
-      applyLoadedThread(thread);
-      await loadRecentFeedback(projectId, agentSessionId);
-    } else {
-      currentThread = null;
-      currentAgentId = null;
-      stopThreadPoll();
-      sending = false;
-      showProjectEmptyState(true);
-      if ($("collab-messages")) $("collab-messages").innerHTML = "";
+
+      const agentInfo = projectAgents.find((a) => a.session_id === agentSessionId);
+      renderThreadBreadcrumb({
+        projectName: project.name,
+        topic: agentInfo?.name || "Project workspace",
+        agentName: agentInfo?.name,
+      });
+
+      await renderProjectPanel(project);
+
+      if (agentSessionId) {
+        showProjectEmptyState(false);
+        let thread = existingThread;
+        if (!thread) {
+          thread = await window.api("/chat/threads", {
+            method: "POST",
+            body: JSON.stringify({
+              thread_type: "project_agent",
+              project_id: projectId,
+              agent_session_id: agentSessionId,
+            }),
+          });
+        }
+        currentAgentId = agentSessionId;
+        applyLoadedThread(thread);
+        await loadRecentFeedback(projectId, agentSessionId);
+      } else {
+        currentThread = null;
+        currentAgentId = null;
+        stopThreadPoll();
+        sending = false;
+        showProjectEmptyState(true);
+        if ($("collab-messages")) $("collab-messages").innerHTML = "";
+      }
+      renderSidebar();
+      updateThreadChatMenu();
+      updateThreadHeaderActions();
+    })();
+
+    navInFlight.set(navKey, task);
+    try {
+      await task;
+    } finally {
+      navInFlight.delete(navKey);
     }
-    renderSidebar();
-    updateThreadChatMenu();
-    updateThreadHeaderActions();
   }
 
   const MSG_ACTION_ICONS = {
@@ -2362,17 +2412,7 @@ const ChatWorkspace = (() => {
 
     hideAllMentionMenus();
 
-    if (content) {
-      appendMessage({ role: "user", content });
-      if (!textOverride) {
-        input.value = "";
-        if (fromWelcome) updateWelcomeSendState();
-        else updateSendState();
-      }
-    }
-
     const agentName = currentAgent()?.name;
-    showThinkingPanel(buildOptimisticProgress(content, agentName), { forceScroll: true });
 
     try {
       let res;
@@ -2390,12 +2430,22 @@ const ChatWorkspace = (() => {
         });
       }
 
+      if (content && !textOverride) {
+        input.value = "";
+        if (fromWelcome) updateWelcomeSendState();
+        else updateSendState();
+      }
+
       if (res?.accepted) {
         if (currentThread?.id === threadId) {
-          currentThread = { ...currentThread, is_generating: true };
-          if (res.generation_progress) {
-            showThinkingPanel(res.generation_progress, { forceScroll: true });
-          }
+          const msgs = [...(currentThread.messages || [])];
+          if (res.user_message) msgs.push(res.user_message);
+          currentThread = { ...currentThread, messages: msgs, is_generating: true };
+          renderMessages(msgs);
+          showThinkingPanel(
+            res.generation_progress || buildOptimisticProgress(content, agentName),
+            { forceScroll: true },
+          );
           updateSendState();
           startThreadPoll(threadId, { immediate: true });
         }
@@ -2426,16 +2476,12 @@ const ChatWorkspace = (() => {
 
       if (currentThread?.id === threadId) {
         removeThinkingPanel();
-        try {
-          const fresh = await window.api(`/chat/threads/${threadId}`);
-          if (fresh.messages?.length) {
-            applyLoadedThread(fresh);
-          } else {
-            appendMessage({ role: "assistant", content: `Error: ${err.message}`, meta: {} });
-          }
-        } catch {
-          appendMessage({ role: "assistant", content: `Error: ${err.message}`, meta: {} });
+        if (content && !textOverride && input) {
+          input.value = content;
+          if (fromWelcome) updateWelcomeSendState();
+          else updateSendState();
         }
+        alert(err.message || "Could not send message");
       }
       sending = false;
       if (currentThread?.id === threadId) updateSendState();
