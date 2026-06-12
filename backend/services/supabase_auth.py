@@ -171,6 +171,14 @@ def reset_password_for_email(email: str, redirect_to: str) -> None:
     })
 
 
+def get_user_from_token(access_token: str) -> dict:
+    return _request("GET", "/user", bearer=access_token)
+
+
+def update_password(access_token: str, password: str) -> dict:
+    return _request("PUT", "/user", body={"password": password}, bearer=access_token)
+
+
 def find_supabase_auth_user(email: str) -> dict | None:
     """Return Supabase auth user dict for email, or None (admin API)."""
     service_key = current_app.config.get("SUPABASE_SERVICE_ROLE_KEY") or ""

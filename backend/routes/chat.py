@@ -250,7 +250,7 @@ def list_chat_agents():
 @chat_bp.route("/sidebar", methods=["GET"])
 @login_required
 def sidebar():
-    """Slack-style sidebar: agent DMs, group chats."""
+    """Slack-style sidebar: agent DMs."""
     agents_raw = (
         StudioSession.query.filter_by(user_id=current_user.id)
         .filter(StudioSession.agent_generated_at.isnot(None))
@@ -279,14 +279,8 @@ def sidebar():
             "hidden_from_roster": bool(ctx.get("hidden_from_roster")),
         })
 
-    groups = (
-        ChatThread.query.filter_by(user_id=current_user.id, thread_type="group")
-        .order_by(ChatThread.updated_at.desc())
-        .all()
-    )
     return jsonify({
         "agent_dms": agent_dms,
-        "group_chats": [_thread_dict(t) for t in groups],
     })
 
 
@@ -314,39 +308,7 @@ def create_thread():
     thread_type = data.get("thread_type", "agent_dm")
 
     if thread_type == "group":
-        participant_ids = []
-        for aid in data.get("participant_agent_ids") or []:
-            if _owned_agent_session(int(aid)):
-                participant_ids.append(int(aid))
-        if len(participant_ids) < 2:
-            return jsonify({"error": "Select at least 2 agents for a group chat"}), 400
-
-        names = [_agent_label(aid)["name"] for aid in participant_ids]
-        title = data.get("title") or ", ".join(names[:3])
-        if len(names) > 3:
-            title += f" +{len(names) - 3}"
-
-        thread = ChatThread(
-            user_id=current_user.id,
-            thread_type="group",
-            agent_session_id=participant_ids[0],
-            participant_agent_ids=participant_ids,
-            title=title,
-        )
-        db.session.add(thread)
-        db.session.flush()
-        db.session.add(ChatMessage(
-            thread_id=thread.id,
-            role="assistant",
-            content=(
-                f"Group chat with **{', '.join(names)}**.\n\n"
-                "Mention an agent with @Name to direct your message. "
-                "Everyone on this thread can collaborate on your request."
-            ),
-            meta={"type": "welcome", "participants": names},
-        ))
-        db.session.commit()
-        return jsonify(_thread_dict(thread, include_messages=True)), 201
+        return jsonify({"error": "Group chats are no longer available"}), 410
 
     if thread_type == "project_agent":
         project_id = data.get("project_id")

@@ -50,6 +50,7 @@ function isCollabHash(hash) {
 }
 
 let landingAuthMode = "login";
+let recoveryTokens = null;
 
 function showView(viewId) {
   document.querySelectorAll("[data-view]").forEach((el) => el.classList.add("hidden"));
@@ -59,7 +60,7 @@ function showView(viewId) {
   document.body.classList.toggle(
     "auth-page",
     viewId === "login" || viewId === "register" || viewId === "forgot-password"
-      || viewId === "plans" || viewId === "plans/success",
+      || viewId === "reset-password" || viewId === "plans" || viewId === "plans/success",
   );
   document.body.classList.toggle("landing-active", viewId === "landing");
   updateHeaderForView(viewId);
@@ -74,7 +75,7 @@ function updateHeaderForView(viewId) {
   const navGuest = document.getElementById("nav-guest");
   const navAuthed = document.getElementById("nav-authed");
   const hideAllNav = viewId === "login" || viewId === "register" || viewId === "forgot-password"
-    || viewId === "plans" || viewId === "plans/success";
+    || viewId === "reset-password" || viewId === "plans" || viewId === "plans/success";
 
   if (hideAllNav) {
     navGuest?.classList.add("hidden");
@@ -104,6 +105,17 @@ function showError(containerId, message) {
   if (!el) return;
   el.innerHTML = `<div class="alert alert-error">${message}</div>`;
   setTimeout(() => { el.innerHTML = ""; }, 5000);
+}
+
+function showSuccess(containerId, message) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const alert = document.createElement("div");
+  alert.className = "alert alert-success";
+  alert.textContent = message;
+  el.innerHTML = "";
+  el.appendChild(alert);
+  setTimeout(() => { el.innerHTML = ""; }, 8000);
 }
 
 function fillBackgroundForm(data) {
@@ -181,6 +193,7 @@ function setLandingAuthMode(mode) {
   const passwordInput = document.getElementById("landing-auth-password");
   const confirmWrap = document.getElementById("landing-auth-confirm-wrap");
   const confirmInput = document.getElementById("landing-auth-password-confirm");
+  const forgotWrap = document.getElementById("landing-auth-forgot-wrap");
 
   if (submitBtn) submitBtn.textContent = isLogin ? "Continue with email" : "Create account";
   if (toggleBtn) toggleBtn.textContent = isLogin ? "Sign up" : "Log in";
@@ -191,11 +204,60 @@ function setLandingAuthMode(mode) {
     passwordInput.autocomplete = isLogin ? "current-password" : "new-password";
   }
   confirmWrap?.classList.toggle("hidden", isLogin);
+  forgotWrap?.classList.toggle("hidden", !isLogin);
   if (confirmInput) {
     confirmInput.required = !isLogin;
     if (isLogin) confirmInput.value = "";
   }
 }
+
+function parseSupabaseRecoveryHash() {
+  const raw = location.hash.slice(1);
+  if (!raw || !raw.includes("access_token=")) return null;
+  const query = raw.includes("access_token=")
+    ? raw.replace(/^reset-password&?/, "").replace(/^[^&]*&(?=access_token=)/, "")
+    : "";
+  const params = new URLSearchParams(query.startsWith("access_token=") ? query : raw);
+  if (params.get("type") !== "recovery" || !params.get("access_token")) return null;
+  return {
+    access_token: params.get("access_token"),
+    refresh_token: params.get("refresh_token"),
+  };
+}
+
+function stripRecoveryHashFromUrl() {
+  if (location.hash.includes("access_token=")) {
+    history.replaceState(null, "", `${location.pathname}${location.search}#reset-password`);
+  }
+}
+
+function clearRecoverySession() {
+  recoveryTokens = null;
+}
+
+document.getElementById("landing-auth-forgot")?.addEventListener("click", async () => {
+  const email = document.getElementById("landing-auth-email")?.value?.trim();
+  if (!email) {
+    showError("landing-auth-error", "Enter your email address first.");
+    return;
+  }
+  const btn = document.getElementById("landing-auth-forgot");
+  try {
+    if (btn) btn.disabled = true;
+    const res = await api("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+    showSuccess(
+      "landing-auth-error",
+      res.message || "If an account exists for that email, a reset link has been sent.",
+    );
+  } catch (err) {
+    showError("landing-auth-error", err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
 
 document.getElementById("landing-auth-toggle")?.addEventListener("click", () => {
   setLandingAuthMode(landingAuthMode === "login" ? "register" : "login");
@@ -311,8 +373,47 @@ document.getElementById("forgot-password-form")?.addEventListener("submit", asyn
   }
 });
 
-document.getElementById("show-forgot-password")?.addEventListener("click", () => showView("forgot-password"));
+document.getElementById("show-forgot-password")?.addEventListener("click", () => {
+  const landingEmail = document.getElementById("landing-auth-email")?.value?.trim();
+  const forgotEmail = document.getElementById("forgot-email");
+  if (landingEmail && forgotEmail) forgotEmail.value = landingEmail;
+  showView("forgot-password");
+});
 document.getElementById("back-to-login")?.addEventListener("click", () => showView("login"));
+document.getElementById("reset-password-back-login")?.addEventListener("click", () => {
+  clearRecoverySession();
+  showView("login");
+});
+
+document.getElementById("reset-password-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const password = document.getElementById("reset-password-new")?.value || "";
+  const confirmPassword = document.getElementById("reset-password-confirm")?.value || "";
+  if (!validateRegisterPasswords(password, confirmPassword, "reset-password-error")) return;
+  if (!recoveryTokens?.access_token) {
+    showError("reset-password-error", "Invalid or expired reset link. Request a new reset email.");
+    return;
+  }
+  try {
+    submitBtn.disabled = true;
+    await api("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({
+        password,
+        password_confirm: confirmPassword,
+        access_token: recoveryTokens.access_token,
+        refresh_token: recoveryTokens.refresh_token,
+      }),
+    });
+    clearRecoverySession();
+    await initApp();
+  } catch (err) {
+    showError("reset-password-error", err.message);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
 
 document.getElementById("logout-btn")?.addEventListener("click", async () => {
   await api("/auth/logout", { method: "POST" });
@@ -1623,6 +1724,15 @@ async function bootstrap() {
   } catch (_) {}
   applyAuthUi(config);
 
+  const recovery = parseSupabaseRecoveryHash();
+  if (recovery) {
+    recoveryTokens = recovery;
+    stripRecoveryHashFromUrl();
+    showView("reset-password");
+    initPasswordToggles();
+    return;
+  }
+
   const hash = location.hash.replace(/^#\/?/, "") || "";
 
   if (!authRequired) {
@@ -1647,8 +1757,9 @@ async function bootstrap() {
     return;
   }
 
-  if (hash === "login" || hash === "register") {
+  if (hash === "login" || hash === "register" || hash === "reset-password") {
     showView(hash);
+    if (hash === "reset-password") initPasswordToggles();
   } else {
     showView("landing");
   }

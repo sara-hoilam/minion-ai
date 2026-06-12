@@ -25,6 +25,7 @@ def test_register_uses_supabase_when_configured(monkeypatch):
 
     monkeypatch.setattr("backend.routes.auth.supabase_sign_up", fake_sign_up)
     monkeypatch.setattr("backend.routes.auth.supabase_auth_enabled", lambda: True)
+    monkeypatch.setattr("backend.routes.auth.find_supabase_auth_user", lambda email: None)
 
     r = client.post("/api/auth/register", json={
         "email": "new@test.com",
@@ -81,6 +82,7 @@ def test_login_redirects_to_register_when_email_missing(monkeypatch):
 
     monkeypatch.setattr("backend.routes.auth.supabase_sign_in", fake_sign_in)
     monkeypatch.setattr("backend.routes.auth.supabase_auth_enabled", lambda: True)
+    monkeypatch.setattr("backend.routes.auth.find_supabase_auth_user", lambda email: None)
     monkeypatch.setattr("backend.routes.auth.auth_user_exists", lambda email: False)
 
     r = client.post("/api/auth/login", json={
@@ -106,6 +108,37 @@ def test_register_rejects_password_mismatch():
     })
     assert r.status_code == 400
     assert "match" in r.get_json()["error"].lower()
+
+
+def test_reset_password_syncs_user_and_logs_in(monkeypatch):
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "DISABLE_AUTH": False,
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_ANON_KEY": "test-anon-key",
+    })
+    client = app.test_client()
+
+    monkeypatch.setattr("backend.routes.auth.supabase_auth_enabled", lambda: True)
+    monkeypatch.setattr("backend.routes.auth.update_password", lambda token, pwd: {"ok": True})
+    monkeypatch.setattr("backend.routes.auth.get_user_from_token", lambda token: {
+        "id": "33333333-3333-3333-3333-333333333333",
+        "email": "user@test.com",
+    })
+
+    r = client.post("/api/auth/reset-password", json={
+        "access_token": "recovery-token",
+        "refresh_token": "refresh-token",
+        "password": "newsecure1",
+        "password_confirm": "newsecure1",
+    })
+    assert r.status_code == 200
+    with app.app_context():
+        user = User.query.filter_by(email="user@test.com").first()
+        assert user is not None
+        assert user.supabase_auth_id == "33333333-3333-3333-3333-333333333333"
+    me = client.get("/api/auth/me")
+    assert me.status_code == 200
 
 
 def test_config_reports_supabase_provider():

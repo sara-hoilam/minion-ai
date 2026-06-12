@@ -8,6 +8,7 @@ from backend.services.supabase_auth import (
     auth_user_exists,
     clear_session_tokens,
     find_supabase_auth_user,
+    get_user_from_token,
     is_supabase_email_confirmed,
     resend_signup_confirmation,
     reset_password_for_email,
@@ -17,6 +18,7 @@ from backend.services.supabase_auth import (
     store_session_tokens,
     supabase_auth_enabled,
     sync_local_user,
+    update_password,
 )
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
@@ -180,8 +182,10 @@ def forgot_password():
 
     if supabase_auth_enabled():
         try:
-            redirect_to = f"{current_app.config.get('APP_URL', 'http://localhost:5000')}/#login"
+            app_url = current_app.config.get("APP_URL", "http://localhost:5000").rstrip("/")
+            redirect_to = f"{app_url}/#reset-password"
             reset_password_for_email(email, redirect_to)
+            log_event("password_reset_requested", {"email": email, "auth": "supabase"})
         except Exception:
             pass
 
@@ -189,6 +193,45 @@ def forgot_password():
         "ok": True,
         "message": "If an account exists for that email, a reset link has been sent.",
     })
+
+
+@auth_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json() or {}
+    password = data.get("password") or ""
+    password_confirm = data.get("password_confirm") or ""
+    access_token = (data.get("access_token") or "").strip()
+    refresh_token = (data.get("refresh_token") or "").strip() or None
+
+    if not password or not password_confirm:
+        return jsonify({"error": "Password and confirmation are required"}), 400
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    if password != password_confirm:
+        return jsonify({"error": "Passwords do not match"}), 400
+    if not access_token:
+        return jsonify({"error": "Invalid or expired reset link. Request a new one."}), 400
+
+    if not supabase_auth_enabled():
+        return jsonify({"error": "Password reset is not available."}), 400
+
+    try:
+        update_password(access_token, password)
+        user_payload = get_user_from_token(access_token)
+        supabase_user_id = user_payload.get("id")
+        user_email = (user_payload.get("email") or "").strip().lower()
+        if not supabase_user_id or not user_email:
+            return jsonify({"error": "Could not complete password reset."}), 400
+
+        user = sync_local_user(supabase_user_id, user_email)
+        store_session_tokens(access_token, refresh_token)
+        _login_local_user(user)
+        log_event("password_reset_completed", {"email": user_email, "auth": "supabase"})
+        return jsonify({"id": user.id, "email": user.email})
+    except Exception:
+        return jsonify({
+            "error": "Could not reset password. The link may have expired — request a new reset email.",
+        }), 400
 
 
 @auth_bp.route("/me", methods=["GET"])

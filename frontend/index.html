@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Minion AI — Train Your Personal Agent</title>
   <meta name="description" content="Personalize a multi-agent AI framework for your field, industry, and skills.">
-  <link rel="stylesheet" href="/css/style.css?v=53">
+  <link rel="stylesheet" href="/css/style.css?v=55">
 </head>
 <body>
   <header class="site-header" id="site-header">
@@ -60,11 +60,6 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 10.5c0-2.2 1.8-4 4-4h4.5c2.2 0 4 1.8 4 4v4.5c0 2.2-1.8 4-4 4H13l-2.5 2v-2H7.5c-2.2 0-4-1.8-4-4v-4.5z"/><path d="M5.5 12.5c-1.4 0-2.5-1.1-2.5-2.5V9c0-2 1.6-3.5 3.5-3.5H10"/></svg>
               </span>
             </button>
-            <button type="button" class="collab-rail-btn" id="collab-rail-groups" title="Group chats" aria-label="Group chats">
-              <span class="collab-rail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="2.75"/><path d="M4.5 18.5c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5"/><circle cx="17" cy="9.5" r="2.25"/><path d="M14.25 18.5c0-1.8 1.2-3.25 3-3.25"/></svg>
-              </span>
-            </button>
           </div>
           <button type="button" class="collab-rail-btn collab-rail-account" id="collab-rail-account" title="Account" aria-label="Account">
             <span class="collab-rail-account-avatar" id="collab-rail-account-avatar">?</span>
@@ -92,7 +87,7 @@
         </div>
 
         <nav class="collab-nav">
-          <section class="collab-section" id="collab-section-agents">
+          <section class="collab-section collapsed" id="collab-section-agents">
             <div class="collab-section-header">
               <button type="button" class="collab-section-toggle" data-section="agents">
                 <span class="collab-section-icon">▾</span> AI agents
@@ -124,16 +119,6 @@
               </button>
             </div>
             <div id="collab-dm-list" class="collab-list"></div>
-          </section>
-
-          <section class="collab-section" id="collab-section-groups">
-            <div class="collab-section-header">
-              <button type="button" class="collab-section-toggle" data-section="groups">
-                <span class="collab-section-icon">▾</span> Group chats
-              </button>
-              <button type="button" class="collab-icon-btn" id="collab-new-group" title="New group chat">+</button>
-            </div>
-            <div id="collab-group-list" class="collab-list"></div>
           </section>
         </nav>
 
@@ -173,7 +158,6 @@
           <div class="collab-quick-chips">
             <button type="button" class="collab-chip" data-starter="Analyze this data and summarize key findings">📊 Analyze data</button>
             <button type="button" class="collab-chip" data-starter="Prepare a report with recommendations">📝 Write report</button>
-            <button type="button" class="collab-chip" data-action="new-group">👥 Group chat</button>
           </div>
         </div>
 
@@ -419,6 +403,9 @@
               </div>
               <button type="submit" class="btn btn-primary btn-block" id="landing-auth-submit">Continue with email</button>
             </form>
+            <p class="auth-card-footer" id="landing-auth-forgot-wrap">
+              <button type="button" class="auth-link-btn" id="landing-auth-forgot">Forgot password?</button>
+            </p>
             <p class="auth-card-footer">
               <span id="landing-auth-toggle-text">Don't have an account?</span>
               <button type="button" class="auth-link-btn" id="landing-auth-toggle">Sign up</button>
@@ -708,6 +695,53 @@
           </form>
           <p class="auth-card-footer">
             <button type="button" class="auth-link-btn" id="back-to-login">Back to log in</button>
+          </p>
+        </div>
+      </div>
+      <div class="auth-split-right" aria-hidden="true">
+        <div class="auth-visual">
+          <div class="auth-visual-content">
+            <h3>Your expertise.<br>One AI agent.</h3>
+            <p>Assess. Train. Deploy.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset password (from email link) -->
+  <div data-view="reset-password" class="hidden">
+    <div class="auth-split">
+      <div class="auth-split-left">
+        <div class="auth-split-form">
+          <div class="logo auth-logo">
+            <div class="logo-icon">✦</div>
+            Minion AI
+          </div>
+          <h2>Set a new password</h2>
+          <p class="subtitle">Choose a new password for your account.</p>
+          <div id="reset-password-error"></div>
+          <form id="reset-password-form">
+            <div class="form-group password-field">
+              <label for="reset-password-new">New password</label>
+              <input type="password" id="reset-password-new" required minlength="8" placeholder="At least 8 characters" autocomplete="new-password">
+              <button type="button" class="password-toggle" data-target="reset-password-new" aria-label="Show password" aria-pressed="false">
+                <svg class="icon-eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="icon-eye-closed hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <div class="form-group password-field">
+              <label for="reset-password-confirm">Confirm password</label>
+              <input type="password" id="reset-password-confirm" required minlength="8" placeholder="Re-enter your password" autocomplete="new-password">
+              <button type="button" class="password-toggle" data-target="reset-password-confirm" aria-label="Show password" aria-pressed="false">
+                <svg class="icon-eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="icon-eye-closed hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Update password</button>
+          </form>
+          <p class="auth-card-footer">
+            <button type="button" class="auth-link-btn" id="reset-password-back-login">Back to log in</button>
           </p>
         </div>
       </div>
@@ -1036,26 +1070,6 @@
     </div>
   </div>
 
-  <!-- Group chat modal -->
-  <div id="group-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-backdrop" id="group-modal-backdrop"></div>
-    <div class="modal-dialog modal-dialog-sm" role="dialog">
-      <div class="modal-header">
-        <h3>New group chat</h3>
-        <button type="button" class="modal-close" id="group-modal-close">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-hint">Select 2 or more agents to collaborate in one thread.</p>
-        <div id="group-agent-picks" class="project-agent-picks"></div>
-        <p id="group-modal-error" class="alert alert-error hidden"></p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" id="group-modal-cancel">Cancel</button>
-        <button type="button" class="btn btn-primary" id="group-modal-save">Start group chat</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Account modal -->
   <div id="account-modal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop" id="account-modal-backdrop"></div>
@@ -1154,7 +1168,7 @@
   <script src="/js/vendor/mermaid.min.js"></script>
   <script src="/js/markdown.js?v=1"></script>
   <script src="/js/background-wizard.js?v=17"></script>
-  <script src="/js/chat-workspace.js?v=50"></script>
+  <script src="/js/chat-workspace.js?v=52"></script>
   <script src="/js/app.js?v=23"></script>
 </body>
 </html>

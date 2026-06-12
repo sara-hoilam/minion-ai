@@ -29,6 +29,7 @@
   --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.08);
   --font: "Inter", system-ui, -apple-system, sans-serif;
+  --font-serif: Georgia, "Times New Roman", "Source Serif 4", serif;
   --max-width: 1120px;
   --header-height: 72px;
 }
@@ -2406,6 +2407,8 @@ body.home-workspace .collab-shell {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
 }
 
 .collab-sidebar-top-row {
@@ -2504,7 +2507,8 @@ body.home-workspace .collab-shell {
   margin-bottom: 0.35rem;
 }
 
-.collab-section.collapsed .collab-list {
+.collab-section.collapsed .collab-list,
+.collab-section.collapsed .collab-project-search-wrap {
   display: none;
 }
 
@@ -2527,12 +2531,12 @@ body.home-workspace .collab-shell {
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.62rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  font-family: var(--font);
+  font-family: var(--font-serif);
   padding: 0.25rem 0.35rem;
   border-radius: 6px;
 }
@@ -2584,9 +2588,10 @@ body.home-workspace .collab-shell {
 
 .collab-list-empty {
   padding: 0.35rem 0.85rem;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--muted);
   font-style: italic;
+  font-family: var(--font-serif);
 }
 
 .collab-nav-row {
@@ -2642,14 +2647,14 @@ body.home-workspace .collab-shell {
   align-items: center;
   gap: 0.55rem;
   width: 100%;
-  padding: 0.4rem 0.65rem;
+  padding: 0.35rem 0.6rem;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  font-family: var(--font);
+  font-family: var(--font-serif);
 }
 
 .collab-nav-item:hover {
@@ -2677,7 +2682,7 @@ body.home-workspace .collab-shell {
 }
 
 .collab-nav-label strong {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -2685,7 +2690,7 @@ body.home-workspace .collab-shell {
 }
 
 .collab-nav-label span {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -2710,7 +2715,7 @@ body.home-workspace .collab-shell {
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  font-family: var(--font);
+  font-family: var(--font-serif);
 }
 
 .collab-profile-btn:hover {
@@ -2737,11 +2742,11 @@ body.home-workspace .collab-shell {
 }
 
 .collab-profile-info strong {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
 }
 
 .collab-profile-info span {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--muted);
 }
 
@@ -2785,13 +2790,14 @@ body.home-workspace .collab-shell {
   font-size: 2.25rem;
   font-weight: 400;
   letter-spacing: -0.03em;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   margin-bottom: 0.35rem;
 }
 
 .collab-greeting-sub {
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.95rem;
+  font-family: var(--font-serif);
 }
 
 .collab-hero-composer {
@@ -3250,10 +3256,11 @@ body.home-workspace .collab-shell {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.4rem 0.55rem;
-  font-size: 0.78rem;
-  font-family: var(--font);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.72rem;
+  font-family: var(--font-serif);
   background: var(--surface);
+}
 }
 
 .collab-project-list {
@@ -4221,7 +4228,7 @@ body.home-workspace .collab-shell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #1a1f2e;
   font-weight: 700;
   font-size: 0.85rem;
   flex-shrink: 0;

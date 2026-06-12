@@ -2,12 +2,11 @@
  * Collaboration hub — Slack sidebar + Claude-style main workspace.
  */
 const ChatWorkspace = (() => {
-  const AVATAR_COLORS = ["#7c3aed", "#ea580c", "#0891b2", "#16a34a", "#db2777", "#4f46e5"];
+  const AVATAR_COLORS = ["#b8d9f0", "#fde68a"];
 
   let agents = [];
   let personas = [];
   let projects = [];
-  let groupChats = [];
   let agentDms = [];
   let currentThread = null;
   let currentMode = "welcome"; // welcome | thread | project | agents-roster | agent-detail | prebuilt-browse
@@ -51,7 +50,10 @@ const ChatWorkspace = (() => {
     window.MinionMarkdown?.enhance?.(root);
   }
 
-  function agentColor(name) {
+  function agentColor(name, index) {
+    if (typeof index === "number") {
+      return AVATAR_COLORS[index % AVATAR_COLORS.length];
+    }
     let hash = 0;
     for (let i = 0; i < (name || "").length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
@@ -63,8 +65,8 @@ const ChatWorkspace = (() => {
     return (parts[0][0] || "A").toUpperCase();
   }
 
-  function agentAvatarStyle(name, deactivated = false) {
-    return deactivated ? "#9ca3af" : agentColor(name);
+  function agentAvatarStyle(name, deactivated = false, index) {
+    return deactivated ? "#9ca3af" : agentColor(name, index);
   }
 
   function agentAvatarClass(size, deactivated = false) {
@@ -100,7 +102,6 @@ const ChatWorkspace = (() => {
   async function loadSidebar() {
     const sidebar = await window.api("/chat/sidebar");
     agentDms = sidebar.agent_dms || [];
-    groupChats = sidebar.group_chats || [];
     agents = agentDms.map((a) => ({
       session_id: a.session_id,
       name: a.name,
@@ -135,7 +136,6 @@ const ChatWorkspace = (() => {
       const active = currentMode === "project" && currentProject?.id === p.id;
       return `
         <button type="button" class="collab-nav-item project${active ? " active" : ""}" data-project-id="${p.id}">
-          <span class="collab-project-dot" aria-hidden="true">📁</span>
           <span class="collab-nav-label"><strong>${escapeHtml(p.name)}</strong></span>
         </button>`;
     }).join("");
@@ -613,7 +613,6 @@ const ChatWorkspace = (() => {
     renderAgentsSidebar();
     renderProjects();
     renderDms();
-    renderGroups();
   }
 
   function rosterAgents() {
@@ -628,8 +627,8 @@ const ChatWorkspace = (() => {
       el.innerHTML = '<p class="collab-list-empty">No agents in roster</p>';
       return;
     }
-    el.innerHTML = roster.map((a) => {
-      const color = agentAvatarStyle(a.name);
+    el.innerHTML = roster.map((a, index) => {
+      const color = agentAvatarStyle(a.name, false, index);
       const active = currentMode === "agent-detail" && currentAgentId === a.session_id;
       return `
         <div class="collab-nav-row">
@@ -705,8 +704,6 @@ const ChatWorkspace = (() => {
     }
     const dm = agentDms.find((a) => a.thread_id === threadId);
     if (dm) return dm.name;
-    const group = groupChats.find((g) => g.id === threadId);
-    if (group) return group.title || "Group chat";
     return "Chat";
   }
 
@@ -803,9 +800,9 @@ const ChatWorkspace = (() => {
       el.innerHTML = '<p class="collab-list-empty">Create an agent to chat</p>';
       return;
     }
-    el.innerHTML = agentDms.map((a) => {
+    el.innerHTML = agentDms.map((a, index) => {
       const deactivated = !!a.hidden_from_roster;
-      const color = agentAvatarStyle(a.name, deactivated);
+      const color = agentAvatarStyle(a.name, deactivated, index);
       const active = currentMode === "thread" && currentAgentId === a.session_id && !currentProject;
       return `
         <button type="button" class="collab-nav-item dm${active ? " active" : ""}${deactivated ? " deactivated" : ""}" data-session-id="${a.session_id}">
@@ -819,25 +816,6 @@ const ChatWorkspace = (() => {
     }).join("");
     el.querySelectorAll("[data-session-id]").forEach((btn) => {
       btn.addEventListener("click", () => openAgentDm(parseInt(btn.dataset.sessionId, 10)));
-    });
-  }
-
-  function renderGroups() {
-    const el = $("collab-group-list");
-    if (!el) return;
-    if (!groupChats.length) {
-      el.innerHTML = '<p class="collab-list-empty">No group chats</p>';
-      return;
-    }
-    el.innerHTML = groupChats.map((g) => navItemHtml({
-      label: g.title || "Group chat",
-      sub: `${(g.participant_agent_ids || []).length} agents`,
-      active: currentThread?.id === g.id,
-      icon: '<span class="collab-nav-hash group">👥</span>',
-      dataAttrs: `data-thread-id="${g.id}"`,
-    })).join("");
-    el.querySelectorAll("[data-thread-id]").forEach((btn) => {
-      btn.addEventListener("click", () => openThread(parseInt(btn.dataset.threadId, 10), "group"));
     });
   }
 
@@ -1613,12 +1591,16 @@ const ChatWorkspace = (() => {
     setHash(`chat/thread/${threadId}`);
 
     const thread = await window.api(`/chat/threads/${threadId}`);
+
+    if (thread.thread_type === "group") {
+      showWelcome();
+      return;
+    }
+
     currentThread = thread;
     currentAgentId = thread.agent_session_id;
 
-    if (type === "group" || thread.thread_type === "group") {
-      renderThreadBreadcrumb({ topic: thread.title || "Group chat" });
-    } else if (thread.thread_type === "project" || thread.thread_type === "project_agent") {
+    if (thread.thread_type === "project" || thread.thread_type === "project_agent") {
       await openProject(thread.project_id, thread, thread.agent_session_id);
       return;
     }
@@ -2686,35 +2668,6 @@ const ChatWorkspace = (() => {
     showWelcome();
   }
 
-  function openGroupModal() {
-    renderAgentPicks("group-agent-picks");
-    $("group-modal-error")?.classList.add("hidden");
-    $("group-modal")?.classList.remove("hidden");
-  }
-
-  function closeGroupModal() { $("group-modal")?.classList.add("hidden"); }
-
-  async function saveGroup() {
-    const picks = [...document.querySelectorAll("#group-agent-picks input:checked")].map((i) => parseInt(i.value, 10));
-    if (picks.length < 2) {
-      $("group-modal-error").textContent = "Select at least 2 agents";
-      $("group-modal-error").classList.remove("hidden");
-      return;
-    }
-    try {
-      const thread = await window.api("/chat/threads", {
-        method: "POST",
-        body: JSON.stringify({ thread_type: "group", participant_agent_ids: picks }),
-      });
-      closeGroupModal();
-      await loadSidebar();
-      await openThread(thread.id, "group");
-    } catch (err) {
-      $("group-modal-error").textContent = err.message;
-      $("group-modal-error").classList.remove("hidden");
-    }
-  }
-
   function accountEmail() {
     const fromProfile = userProfile?.email?.trim();
     if (fromProfile) return fromProfile;
@@ -3120,10 +3073,6 @@ const ChatWorkspace = (() => {
       expandSidebar();
       $("collab-section-dms")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-    $("collab-rail-groups")?.addEventListener("click", () => {
-      expandSidebar();
-      $("collab-section-groups")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   }
 
   function bindEvents() {
@@ -3142,7 +3091,6 @@ const ChatWorkspace = (() => {
       clearTimeout(prebuiltSearchTimer);
       prebuiltSearchTimer = setTimeout(() => loadPrebuiltCatalog(prebuiltSearch), 200);
     });
-    $("collab-new-group")?.addEventListener("click", openGroupModal);
     $("collab-new-project")?.addEventListener("click", () => openProjectModal());
     $("collab-project-search")?.addEventListener("input", (e) => {
       projectSearch = e.target.value || "";
@@ -3177,11 +3125,6 @@ const ChatWorkspace = (() => {
       closeProjectAgentModal();
       window.BackgroundWizard?.open({ mode: "new_agent", prefill: {} });
     });
-
-    $("group-modal-save")?.addEventListener("click", saveGroup);
-    $("group-modal-cancel")?.addEventListener("click", closeGroupModal);
-    $("group-modal-close")?.addEventListener("click", closeGroupModal);
-    $("group-modal-backdrop")?.addEventListener("click", closeGroupModal);
 
     $("collab-account-btn")?.addEventListener("click", openAccountModal);
     $("collab-rail-account")?.addEventListener("click", openAccountModal);
@@ -3291,9 +3234,7 @@ const ChatWorkspace = (() => {
 
     document.querySelectorAll(".collab-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
-        const action = chip.dataset.action;
-        if (action === "new-group") openGroupModal();
-        else if (chip.dataset.starter) {
+        if (chip.dataset.starter) {
           $("collab-welcome-input").value = chip.dataset.starter;
           sendMessage(chip.dataset.starter, true);
         }

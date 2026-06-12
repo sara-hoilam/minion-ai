@@ -150,7 +150,7 @@ class ChatThread(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    thread_type = db.Column(db.String(20), default="agent_dm", index=True)  # agent_dm | group | project | project_agent
+    thread_type = db.Column(db.String(20), default="agent_dm", index=True)  # agent_dm | project | project_agent
     agent_session_id = db.Column(db.Integer, db.ForeignKey("studio_sessions.id"), index=True)
     project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), index=True)
     participant_agent_ids = db.Column(db.JSON)
