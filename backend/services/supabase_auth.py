@@ -171,6 +171,59 @@ def reset_password_for_email(email: str, redirect_to: str) -> None:
     })
 
 
+def find_supabase_auth_user(email: str) -> dict | None:
+    """Return Supabase auth user dict for email, or None (admin API)."""
+    service_key = current_app.config.get("SUPABASE_SERVICE_ROLE_KEY") or ""
+    if not service_key:
+        return None
+    normalized = email.strip().lower()
+    page = 1
+    while page <= 10:
+        listing = _request(
+            "GET",
+            f"/admin/users?page={page}&per_page=200",
+            api_key=service_key,
+            bearer=service_key,
+        )
+        users = listing.get("users") if isinstance(listing, dict) else listing
+        if not isinstance(users, list):
+            break
+        for u in users:
+            if (u.get("email") or "").lower() == normalized:
+                return u
+        if len(users) < 200:
+            break
+        page += 1
+    return None
+
+
+def is_supabase_email_confirmed(auth_user: dict) -> bool:
+    return bool(auth_user.get("email_confirmed_at") or auth_user.get("confirmed_at"))
+
+
+def supabase_auth_user_exists(email: str) -> bool:
+    return find_supabase_auth_user(email) is not None
+
+
+def resend_signup_confirmation(email: str) -> None:
+    redirect_to = f"{current_app.config.get('APP_URL', 'http://localhost:5000')}/#login"
+    _request("POST", "/resend", body={
+        "email": email.strip().lower(),
+        "type": "signup",
+        "options": {"email_redirect_to": redirect_to},
+    })
+
+
+def auth_user_exists(email: str) -> bool:
+    """True if the email exists in the local DB or Supabase Auth."""
+    normalized = email.strip().lower()
+    if User.query.filter_by(email=normalized).first():
+        return True
+    if supabase_auth_enabled():
+        return supabase_auth_user_exists(normalized)
+    return False
+
+
 def ensure_supabase_user(email: str, password: str, *, email_confirm: bool = True) -> str | None:
     """Create a Supabase auth user via admin API (demo seeding). Returns auth user id."""
     service_key = current_app.config.get("SUPABASE_SERVICE_ROLE_KEY") or ""

@@ -67,6 +67,47 @@ def test_login_uses_supabase_when_configured(monkeypatch):
     assert me.get_json()["auth_provider"] == "supabase"
 
 
+def test_login_redirects_to_register_when_email_missing(monkeypatch):
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "DISABLE_AUTH": False,
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_ANON_KEY": "test-anon-key",
+    })
+    client = app.test_client()
+
+    def fake_sign_in(email, password):
+        raise ValueError("Invalid credentials")
+
+    monkeypatch.setattr("backend.routes.auth.supabase_sign_in", fake_sign_in)
+    monkeypatch.setattr("backend.routes.auth.supabase_auth_enabled", lambda: True)
+    monkeypatch.setattr("backend.routes.auth.auth_user_exists", lambda email: False)
+
+    r = client.post("/api/auth/login", json={
+        "email": "missing@test.com",
+        "password": "securepass1",
+    })
+    assert r.status_code == 404
+    data = r.get_json()
+    assert data["redirect"] == "register"
+    assert data["email"] == "missing@test.com"
+
+
+def test_register_rejects_password_mismatch():
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "DISABLE_AUTH": False,
+    })
+    client = app.test_client()
+    r = client.post("/api/auth/register", json={
+        "email": "new@test.com",
+        "password": "securepass1",
+        "password_confirm": "different1",
+    })
+    assert r.status_code == 400
+    assert "match" in r.get_json()["error"].lower()
+
+
 def test_config_reports_supabase_provider():
     app = create_app({
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",

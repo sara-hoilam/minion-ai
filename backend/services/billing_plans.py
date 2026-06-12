@@ -43,11 +43,10 @@ PLANS: dict[str, Plan] = {
         Plan("growth", "Growth", 25, "For power users running agents daily", "STRIPE_PRICE_GROWTH"),
         Plan("professional", "Professional", 60, "For teams with heavier automation", "STRIPE_PRICE_PROFESSIONAL"),
         Plan("business", "Business", 150, "For departments scaling AI agents", "STRIPE_PRICE_BUSINESS"),
-        Plan("enterprise", "Enterprise", 350, "For org-wide agent deployments", "STRIPE_PRICE_ENTERPRISE"),
     ]
 }
 
-PLAN_ORDER = ["starter", "growth", "professional", "business", "enterprise"]
+PLAN_ORDER = ["starter", "growth", "professional", "business"]
 
 
 def get_plan(plan_id: str | None) -> Plan | None:

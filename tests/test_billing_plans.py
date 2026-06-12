@@ -24,7 +24,6 @@ def test_plan_monthly_token_allowance_is_sixty_percent():
     assert get_plan("growth").monthly_token_usd == 15.0
     assert get_plan("professional").monthly_token_usd == 36.0
     assert get_plan("business").monthly_token_usd == 90.0
-    assert get_plan("enterprise").monthly_token_usd == 210.0
 
 
 def test_upgrade_token_credit_is_sixty_percent_of_price_difference():
@@ -115,6 +114,8 @@ def test_post_message_returns_402_without_subscription():
     app = create_app({
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "DISABLE_AUTH": False,
+        "SUPABASE_ANON_KEY": "",
+        "SUPABASE_URL": "",
     })
     client = app.test_client()
     client.post("/api/auth/register", json={"email": "blocked@test.com", "password": "securepass1"})
@@ -125,14 +126,24 @@ def test_post_message_returns_402_without_subscription():
         "current_job": "Analyst",
         "industry": "SaaS",
     })
+    jd = {"title": "Analyst", "summary": "Finance agent.", "responsibilities": ["Analyze data"]}
+    fw = client.post("/api/agents/framework-preview", json={
+        "full_name": "Blocked",
+        "field": "Finance",
+        "skillset": "SQL",
+        "current_job": "Analyst",
+        "industry": "SaaS",
+        "job_description": jd,
+    }).get_json()
+    assert fw and fw.get("framework"), fw
     session_id = client.post("/api/agents/create", json={
         "full_name": "Blocked",
         "field": "Finance",
         "skillset": "SQL",
         "current_job": "Analyst",
         "industry": "SaaS",
-        "job_description": {"title": "A", "summary": "S", "responsibilities": ["R"]},
-        "framework_design": {"framework": {"name": "F"}, "construction_answers": {}},
+        "job_description": jd,
+        "framework_design": {"framework": fw["framework"], "construction_answers": {}},
     }).get_json()["session_id"]
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 

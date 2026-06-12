@@ -5,7 +5,11 @@ from backend.models import User, UserProfile, db
 from backend.services.dev_auth import DEMO_EMAIL, login_demo_user
 from backend.services.event_logger import log_event
 from backend.services.supabase_auth import (
+    auth_user_exists,
     clear_session_tokens,
+    find_supabase_auth_user,
+    is_supabase_email_confirmed,
+    resend_signup_confirmation,
     reset_password_for_email,
     sign_in as supabase_sign_in,
     sign_out as supabase_sign_out,
@@ -29,21 +33,43 @@ def register():
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
+    password_confirm = data.get("password_confirm") or ""
+
     if not email or not password:
         return jsonify({"error": "Email and password required"}), 400
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
+    if password_confirm and password != password_confirm:
+        return jsonify({"error": "Passwords do not match"}), 400
 
     if User.query.filter_by(email=email).first() and not supabase_auth_enabled():
         return jsonify({"error": "Email already registered"}), 409
 
     if supabase_auth_enabled():
+        existing = find_supabase_auth_user(email)
+        if existing:
+            if not is_supabase_email_confirmed(existing):
+                try:
+                    resend_signup_confirmation(email)
+                    resent = True
+                except Exception:
+                    resent = False
+                message = (
+                    "An account with this email already exists but isn't confirmed yet. "
+                    + ("We sent another confirmation email — check your inbox (and spam)." if resent else "Check your inbox for the confirmation link.")
+                )
+                return jsonify({
+                    "error": message,
+                    "email_confirmation_required": True,
+                }), 409
+            return jsonify({"error": "Email already registered. Log in instead."}), 409
+
         try:
             result = supabase_sign_up(email, password)
         except Exception as exc:
             msg = str(exc).lower()
             if "already" in msg or "registered" in msg or "exists" in msg:
-                return jsonify({"error": "Email already registered"}), 409
+                return jsonify({"error": "Email already registered. Log in instead."}), 409
             return jsonify({"error": "Could not create account. Try again or log in."}), 400
 
         if result.email_confirmation_required:
@@ -93,8 +119,20 @@ def login():
         try:
             result = supabase_sign_in(email, password)
         except Exception:
+            existing = find_supabase_auth_user(email)
+            if existing and not is_supabase_email_confirmed(existing):
+                return jsonify({
+                    "error": "Please confirm your email before signing in. Check your inbox (and spam) for the confirmation link.",
+                    "email_confirmation_required": True,
+                }), 403
+            if not auth_user_exists(email):
+                return jsonify({
+                    "error": "No account found for this email.",
+                    "redirect": "register",
+                    "email": email,
+                }), 404
             return jsonify({
-                "error": "Invalid credentials. Check your email and password, or confirm your email if you just signed up.",
+                "error": "Invalid credentials. Check your email and password.",
             }), 401
 
         user = sync_local_user(result.supabase_user_id, result.email)
@@ -104,13 +142,19 @@ def login():
         return jsonify({"id": user.id, "email": user.email})
 
     user = User.query.filter_by(email=email).first()
-    if not user or not user.check_password(password):
+    if not user:
+        return jsonify({
+            "error": "No account found for this email.",
+            "redirect": "register",
+            "email": email,
+        }), 404
+    if not user.check_password(password):
         if email == DEMO_EMAIL:
             return jsonify({
                 "error": "Invalid credentials. Try password: demo, or register a new account.",
             }), 401
         return jsonify({
-            "error": "Invalid credentials. Check your email and password, or create an account.",
+            "error": "Invalid credentials. Check your email and password.",
         }), 401
 
     _login_local_user(user)

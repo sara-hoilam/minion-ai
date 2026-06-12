@@ -2745,52 +2745,30 @@ const ChatWorkspace = (() => {
     return (local[0] || "?").toUpperCase();
   }
 
+  let accountModalView = "overview";
+
+  function accountBilling() {
+    return window.Billing || null;
+  }
+
+  function formatAccountUsd(amount) {
+    return accountBilling()?.formatUsd?.(amount) || `$${Number(amount || 0).toFixed(2)}`;
+  }
+
+  function formatAccountDate(iso) {
+    return accountBilling()?.formatPlanDate?.(iso) || "—";
+  }
+
   function closeAccountModal() {
+    accountModalView = "overview";
     const modal = $("account-modal");
+    const dialog = modal?.querySelector(".modal-dialog");
+    dialog?.classList.remove("account-modal-wide");
     modal?.classList.add("hidden");
     modal?.setAttribute("aria-hidden", "true");
   }
 
-  function openAccountModal() {
-    const body = $("account-modal-body");
-    if (!body) return;
-    const email = accountEmail();
-    const signedIn = !!email;
-    const showLogout = !document.getElementById("logout-btn")?.classList.contains("hidden");
-    body.innerHTML = `
-      <div class="account-panel">
-        <section class="account-section">
-          <h4>Sign in</h4>
-          <div class="account-login-row">
-            <p class="account-value">${escapeHtml(email || "Not signed in")}</p>
-            ${signedIn ? '<span class="account-status-pill">Signed in</span>' : ""}
-          </div>
-          ${signedIn ? "" : '<button type="button" class="btn btn-primary btn-sm" id="account-modal-signin">Sign in</button>'}
-          <p class="account-muted">Manage your login and session here.</p>
-        </section>
-        <section class="account-section">
-          <h4>Token usage</h4>
-          <div class="account-token-bar" aria-hidden="true">
-            <div class="account-token-fill" style="width:0%"></div>
-          </div>
-          <p class="account-value">— / — tokens</p>
-          <p class="account-muted">Usage tracking and limits are coming soon.</p>
-        </section>
-        <section class="account-section">
-          <h4>Plan</h4>
-          <p class="account-value">Free plan</p>
-          <p class="account-muted">Subscription tiers and pricing are not finalized yet.</p>
-          <button type="button" class="btn btn-secondary btn-sm" disabled>Upgrade plan</button>
-        </section>
-        ${showLogout ? `
-        <section class="account-section">
-          <button type="button" class="btn btn-secondary btn-sm" id="account-modal-logout">Log out</button>
-        </section>` : ""}
-      </div>`;
-    body.querySelector("#account-modal-signin")?.addEventListener("click", () => {
-      closeAccountModal();
-      window.showView?.("login");
-    });
+  function bindAccountLogout(body) {
     body.querySelector("#account-modal-logout")?.addEventListener("click", async () => {
       try {
         await window.api("/auth/logout", { method: "POST" });
@@ -2799,9 +2777,274 @@ const ChatWorkspace = (() => {
         console.error(err);
       }
     });
+  }
+
+  function renderAccountPayment(body) {
+    const billing = accountBilling();
+    const sub = billing?.getSubscription?.();
+    const plans = billing?.getConfig?.()?.plans || [];
+    const hasAccess = Boolean(sub?.access_granted);
+    const currentId = sub?.plan_id;
+
+    const usageHtml = hasAccess ? (() => {
+      const used = Number(sub.token_used_usd || 0);
+      const budget = Number(sub.token_budget_usd || 0);
+      const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
+      const cancelNote = sub.cancel_at_period_end
+        ? `<p class="account-muted account-cancel-note">Cancels on ${escapeHtml(formatAccountDate(sub.current_period_end))}</p>`
+        : "";
+      return `
+        <section class="account-section account-section-compact">
+          <p class="account-muted">Current — ${escapeHtml(billing.getCurrentPlanLabel())}</p>
+          <div class="account-token-bar" aria-hidden="true">
+            <div class="account-token-fill" style="width:${pct}%"></div>
+          </div>
+          <p class="account-value account-value-sm">${formatAccountUsd(used)} / ${formatAccountUsd(budget)} tokens</p>
+          ${cancelNote}
+        </section>`;
+    })() : "";
+
+    body.innerHTML = `
+      <div class="account-panel account-panel-payment">
+        <button type="button" class="account-back-btn" id="account-payment-back">← Back</button>
+        <section class="account-section account-section-flush">
+          <h4>Choose a plan</h4>
+          <p class="account-muted">Each plan includes 60% of the price as monthly API tokens. Unused tokens do not roll over.</p>
+        </section>
+        <div id="account-payment-message"></div>
+        <div id="account-payment-error"></div>
+        ${usageHtml}
+        <div class="account-plan-list">
+          ${plans.map((plan) => {
+            const rank = billing.planPriceRank(plan.id);
+            const isCurrent = hasAccess && plan.id === currentId;
+            const action = billing.planActionLabel(plan.id);
+            const buyLabel = action.label === "Upgrade" || action.label === "Subscribe" ? "Buy" : action.label;
+            return `
+              <div class="account-plan-row${isCurrent ? " account-plan-row-current" : ""}">
+                <div class="account-plan-row-main">
+                  <div class="account-plan-row-head">
+                    <span class="account-plan-row-name">${escapeHtml(plan.name)}</span>
+                    ${isCurrent ? '<span class="account-plan-row-badge">Current</span>' : ""}
+                  </div>
+                  <div class="account-plan-row-price">${escapeHtml(plan.price_display)}<span>/mo</span></div>
+                  <p class="account-muted">${formatAccountUsd(plan.monthly_token_usd)} tokens/mo</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm account-plan-buy-btn"
+                  data-plan-id="${escapeHtml(plan.id)}"
+                  ${action.disabled ? "disabled" : ""}>${escapeHtml(buyLabel)}</button>
+              </div>`;
+          }).join("")}
+        </div>
+        ${hasAccess ? `
+        <section class="account-section account-section-compact">
+          <div class="account-payment-actions">
+            ${sub.cancel_at_period_end
+              ? '<button type="button" class="btn btn-primary btn-sm" id="account-reactivate-btn">Reactivate subscription</button>'
+              : '<button type="button" class="btn btn-secondary btn-sm" id="account-cancel-btn">Cancel at period end</button>'}
+          </div>
+        </section>` : ""}
+      </div>`;
+
+    body.querySelector("#account-payment-back")?.addEventListener("click", () => {
+      accountModalView = "overview";
+      openAccountModal();
+    });
+
+    body.querySelectorAll(".account-plan-buy-btn:not([disabled])").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          await billing.checkoutPlan(btn.dataset.planId, {
+            messageElId: "account-payment-message",
+            errorElId: "account-payment-error",
+            refreshPlansPage: false,
+            onUpdated: async () => {
+              await billing.load();
+              updateUserFooter();
+              openAccountModal();
+            },
+          });
+        } catch (_) {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    body.querySelector("#account-cancel-btn")?.addEventListener("click", async () => {
+      try {
+        await billing.cancel();
+        await billing.load();
+        renderAccountPayment(body);
+        updateUserFooter();
+      } catch (err) {
+        const errEl = body.querySelector("#account-payment-error");
+        if (errEl) errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+      }
+    });
+
+    body.querySelector("#account-reactivate-btn")?.addEventListener("click", async () => {
+      try {
+        await billing.reactivate();
+        await billing.load();
+        renderAccountPayment(body);
+        updateUserFooter();
+      } catch (err) {
+        const errEl = body.querySelector("#account-payment-error");
+        if (errEl) errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+      }
+    });
+  }
+
+  function renderAccountOverview(body) {
+    const email = accountEmail();
+    const signedIn = !!email;
+    const showLogout = !document.getElementById("logout-btn")?.classList.contains("hidden");
+    const billing = accountBilling();
+    const sub = billing?.getSubscription?.();
+    const hasAccess = Boolean(sub?.access_granted);
+    const planLabel = billing?.getCurrentPlanLabel?.() || "No plan";
+    const nextPlan = billing?.getNextPlanTier?.();
+
+    let tokenSection = `
+      <section class="account-section">
+        <h4>Token usage</h4>
+        <div class="account-token-bar" aria-hidden="true">
+          <div class="account-token-fill" style="width:0%"></div>
+        </div>
+        <p class="account-value">— / — tokens</p>
+        <p class="account-muted">Subscribe to a plan to get a monthly API token allowance.</p>
+      </section>`;
+
+    if (hasAccess) {
+      const used = Number(sub.token_used_usd || 0);
+      const budget = Number(sub.token_budget_usd || 0);
+      const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
+      const periodNote = sub.current_period_end
+        ? `Resets ${formatAccountDate(sub.current_period_end)}`
+        : "";
+      tokenSection = `
+        <section class="account-section">
+          <h4>Token usage</h4>
+          <div class="account-token-bar" aria-hidden="true">
+            <div class="account-token-fill" style="width:${pct}%"></div>
+          </div>
+          <p class="account-value">${formatAccountUsd(used)} / ${formatAccountUsd(budget)}</p>
+          <p class="account-muted">${periodNote || "Monthly allowance — unused tokens do not roll over."}</p>
+        </section>`;
+    }
+
+    let upgradeSection = "";
+    if (nextPlan) {
+      const buyLabel = hasAccess ? "Buy upgrade" : "Buy";
+      upgradeSection = `
+        <section class="account-section">
+          <h4>${hasAccess ? "Upgrade" : "Plan"}</h4>
+          <p class="account-value">${escapeHtml(nextPlan.name)} · ${escapeHtml(nextPlan.price_display)}/mo</p>
+          <p class="account-muted">${formatAccountUsd(nextPlan.monthly_token_usd)} API tokens/mo (60%) · ${escapeHtml(nextPlan.description)}</p>
+          <button type="button" class="btn btn-primary btn-sm" id="account-buy-next">${escapeHtml(buyLabel)}</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="account-view-plans">View all plans</button>
+        </section>`;
+    } else if (hasAccess) {
+      upgradeSection = `
+        <section class="account-section">
+          <h4>Plan</h4>
+          <p class="account-value">You're on our highest tier</p>
+          <p class="account-muted">Manage billing or cancel from the plans page.</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="account-view-plans">Manage subscription</button>
+        </section>`;
+    } else {
+      upgradeSection = `
+        <section class="account-section">
+          <h4>Plan</h4>
+          <p class="account-muted">Pick a monthly plan to unlock your workspace and API tokens.</p>
+          <button type="button" class="btn btn-primary btn-sm" id="account-view-plans">Choose a plan</button>
+        </section>`;
+    }
+
+    body.innerHTML = `
+      <div class="account-panel">
+        <section class="account-section">
+          <h4>Sign in</h4>
+          <div class="account-login-row">
+            <p class="account-value">${escapeHtml(email || "Not signed in")}</p>
+            ${signedIn ? '<span class="account-status-pill">Signed in</span>' : ""}
+          </div>
+          ${signedIn ? `<p class="account-current-plan">${escapeHtml(planLabel)}</p>` : ""}
+          ${signedIn ? "" : '<button type="button" class="btn btn-primary btn-sm" id="account-modal-signin">Sign in</button>'}
+          <p class="account-muted">Manage your login and session here.</p>
+        </section>
+        ${tokenSection}
+        ${upgradeSection}
+        <div id="account-overview-message"></div>
+        <div id="account-overview-error"></div>
+        ${showLogout ? `
+        <section class="account-section">
+          <button type="button" class="btn btn-secondary btn-sm" id="account-modal-logout">Log out</button>
+        </section>` : ""}
+      </div>`;
+
+    body.querySelector("#account-modal-signin")?.addEventListener("click", () => {
+      closeAccountModal();
+      window.showView?.("login");
+    });
+    bindAccountLogout(body);
+
+    body.querySelector("#account-view-plans")?.addEventListener("click", () => {
+      accountModalView = "payment";
+      openAccountModal();
+    });
+
+    body.querySelector("#account-buy-next")?.addEventListener("click", async () => {
+      if (!nextPlan || !billing) return;
+      const btn = body.querySelector("#account-buy-next");
+      if (btn) btn.disabled = true;
+      try {
+        await billing.checkoutPlan(nextPlan.id, {
+          messageElId: "account-overview-message",
+          errorElId: "account-overview-error",
+          refreshPlansPage: false,
+          onUpdated: async () => {
+            await billing.load();
+            updateUserFooter();
+            openAccountModal();
+          },
+        });
+      } catch (_) {
+        if (btn) btn.disabled = false;
+      }
+    });
+  }
+
+  async function openAccountModal() {
+    const body = $("account-modal-body");
     const modal = $("account-modal");
-    modal?.classList.remove("hidden");
-    modal?.setAttribute("aria-hidden", "false");
+    const dialog = modal?.querySelector(".modal-dialog");
+    if (!body || !modal) return;
+
+    if (accountModalView === "payment") {
+      dialog?.classList.add("account-modal-wide");
+      $("account-modal-title").textContent = "Subscription";
+    } else {
+      dialog?.classList.remove("account-modal-wide");
+      $("account-modal-title").textContent = "Account";
+    }
+
+    body.innerHTML = `<p class="account-muted" style="padding:0.5rem 0">Loading…</p>`;
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+
+    try {
+      if (window.Billing?.load) await window.Billing.load();
+    } catch (err) {
+      console.error("Failed to load billing:", err);
+    }
+
+    if (accountModalView === "payment") {
+      renderAccountPayment(body);
+    } else {
+      renderAccountOverview(body);
+    }
   }
 
   function openProfileModal() {
@@ -2811,10 +3054,11 @@ const ChatWorkspace = (() => {
   function updateUserFooter() {
     const displayName = accountDisplayName();
     const initial = accountInitial();
+    const planLabel = window.Billing?.getCurrentPlanLabel?.() || "No plan";
     if ($("collab-user-name")) $("collab-user-name").textContent = displayName;
     if ($("collab-user-avatar")) $("collab-user-avatar").textContent = initial;
     if ($("collab-rail-account-avatar")) $("collab-rail-account-avatar").textContent = initial;
-    if ($("collab-user-plan")) $("collab-user-plan").textContent = "Free plan";
+    if ($("collab-user-plan")) $("collab-user-plan").textContent = planLabel;
     $("collab-greeting") && ($("collab-greeting").textContent = greeting());
   }
 

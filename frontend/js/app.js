@@ -1,5 +1,13 @@
 const API = "/api";
 
+class ApiError extends Error {
+  constructor(message, extra = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.extra = extra;
+  }
+}
+
 let currentUser = null;
 let authRequired = true;
 let studioSession = null;
@@ -15,7 +23,7 @@ async function api(path, options = {}) {
     ...options,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw new ApiError(data.error || res.statusText, data);
   return data;
 }
 
@@ -108,6 +116,62 @@ function showResumeStatus() {
 
 // --- Auth ---
 
+function initPasswordToggles() {
+  document.querySelectorAll(".password-toggle").forEach((btn) => {
+    if (btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", () => {
+      const input = document.getElementById(btn.dataset.target);
+      if (!input) return;
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.setAttribute("aria-pressed", show ? "true" : "false");
+      btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      btn.querySelector(".icon-eye-open")?.classList.toggle("hidden", show);
+      btn.querySelector(".icon-eye-closed")?.classList.toggle("hidden", !show);
+    });
+  });
+}
+
+function passwordsMatch(password, confirmPassword) {
+  return password === confirmPassword;
+}
+
+function validateRegisterPasswords(password, confirmPassword, errorContainerId) {
+  if (password.length < 8) {
+    showError(errorContainerId, "Password must be at least 8 characters.");
+    return false;
+  }
+  if (!passwordsMatch(password, confirmPassword)) {
+    showError(errorContainerId, "Passwords do not match.");
+    return false;
+  }
+  return true;
+}
+
+function redirectToRegister(email, { preferLanding = false } = {}) {
+  const onLanding = preferLanding
+    || !document.querySelector('[data-view="landing"]')?.classList.contains("hidden");
+  if (onLanding) {
+    setLandingAuthMode("register");
+    const emailEl = document.getElementById("landing-auth-email");
+    if (emailEl && email) emailEl.value = email;
+    scrollToLandingAuth("register");
+    return;
+  }
+  showView("register");
+  const regEmail = document.getElementById("register-email");
+  if (regEmail && email) regEmail.value = email;
+}
+
+function handleAuthRedirect(err) {
+  if (err instanceof ApiError && err.extra.redirect === "register") {
+    redirectToRegister(err.extra.email || "", { preferLanding: landingAuthMode === "login" });
+    return true;
+  }
+  return false;
+}
+
 function setLandingAuthMode(mode) {
   landingAuthMode = mode;
   const isLogin = mode === "login";
@@ -115,6 +179,8 @@ function setLandingAuthMode(mode) {
   const toggleBtn = document.getElementById("landing-auth-toggle");
   const toggleText = document.getElementById("landing-auth-toggle-text");
   const passwordInput = document.getElementById("landing-auth-password");
+  const confirmWrap = document.getElementById("landing-auth-confirm-wrap");
+  const confirmInput = document.getElementById("landing-auth-password-confirm");
 
   if (submitBtn) submitBtn.textContent = isLogin ? "Continue with email" : "Create account";
   if (toggleBtn) toggleBtn.textContent = isLogin ? "Sign up" : "Log in";
@@ -123,6 +189,11 @@ function setLandingAuthMode(mode) {
     passwordInput.placeholder = isLogin ? "Password" : "At least 8 characters";
     passwordInput.minLength = isLogin ? 0 : 8;
     passwordInput.autocomplete = isLogin ? "current-password" : "new-password";
+  }
+  confirmWrap?.classList.toggle("hidden", isLogin);
+  if (confirmInput) {
+    confirmInput.required = !isLogin;
+    if (isLogin) confirmInput.value = "";
   }
 }
 
@@ -142,9 +213,11 @@ document.getElementById("landing-auth-form")?.addEventListener("submit", async (
       return;
     }
     if (landingAuthMode === "register") {
+      const confirmPassword = document.getElementById("landing-auth-password-confirm")?.value || "";
+      if (!validateRegisterPasswords(password, confirmPassword, "landing-auth-error")) return;
       await api("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, password_confirm: confirmPassword }),
       });
       trackEvent("signup_completed");
     } else {
@@ -155,6 +228,7 @@ document.getElementById("landing-auth-form")?.addEventListener("submit", async (
     }
     await initApp();
   } catch (err) {
+    if (handleAuthRedirect(err)) return;
     showError("landing-auth-error", err.message);
   } finally {
     submitBtn.disabled = false;
@@ -177,6 +251,7 @@ document.getElementById("login-form")?.addEventListener("submit", async (e) => {
     });
     await initApp();
   } catch (err) {
+    if (handleAuthRedirect(err)) return;
     showError("login-error", err.message);
   }
 });
@@ -190,11 +265,15 @@ document.getElementById("register-form")?.addEventListener("submit", async (e) =
       await initApp();
       return;
     }
+    const password = document.getElementById("register-password").value;
+    const confirmPassword = document.getElementById("register-password-confirm").value;
+    if (!validateRegisterPasswords(password, confirmPassword, "register-error")) return;
     const res = await api("/auth/register", {
       method: "POST",
       body: JSON.stringify({
         email: document.getElementById("register-email").value,
-        password: document.getElementById("register-password").value,
+        password,
+        password_confirm: confirmPassword,
       }),
     });
     if (res.email_confirmation_required) {
@@ -1576,4 +1655,5 @@ async function bootstrap() {
 }
 
 setLandingAuthMode("login");
+initPasswordToggles();
 bootstrap();

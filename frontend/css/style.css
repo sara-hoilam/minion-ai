@@ -5612,6 +5612,48 @@ body.landing-active .site-header {
   border-color: var(--border);
 }
 
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 2.75rem;
+  width: 100%;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.form-group.password-field .password-toggle {
+  top: auto;
+  bottom: 0.55rem;
+  transform: none;
+}
+
+.password-toggle:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.password-toggle svg {
+  display: block;
+}
+
 .auth-card-footer {
   text-align: center;
   font-size: 0.85rem;
