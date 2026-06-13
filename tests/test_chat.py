@@ -57,7 +57,7 @@ def test_sidebar_includes_agent_without_dm_thread():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "sidebar@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "sidebar@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client, name="Richard")
 
     with app.app_context():
@@ -78,7 +78,7 @@ def test_create_agent_creates_dm_thread():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "dm@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "dm@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client, name="Richard")
 
     with app.app_context():
@@ -94,7 +94,7 @@ def test_list_chat_agents():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "chat@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "chat@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
 
     r = client.get("/api/chat/agents")
@@ -111,7 +111,7 @@ def test_create_thread_welcome_message():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "thread@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "thread@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
 
     r = client.post("/api/chat/threads", json={"agent_session_id": session_id})
@@ -129,7 +129,7 @@ def test_post_message_simple_reply():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "msg@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "msg@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -154,7 +154,7 @@ def test_message_rating_toggle():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "rating@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "rating@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -193,7 +193,7 @@ def test_post_message_team_task():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "team@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "team@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     client.post("/api/profile/background", json={
         "full_name": "Sara",
         "field": "Finance",
@@ -239,7 +239,7 @@ def test_user_message_persisted_before_assistant_reply():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "persist@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "persist@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -274,7 +274,7 @@ def test_cancel_generation_sets_flag():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "cancel@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "cancel@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -301,7 +301,7 @@ def test_thread_includes_generation_progress():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "prog@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "prog@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -328,7 +328,7 @@ def test_thread_reports_generating_flag():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "gen@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "gen@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -347,7 +347,7 @@ def test_history_excludes_cancelled_assistant_messages():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "hist@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "hist@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -384,7 +384,7 @@ def test_delete_thread():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "delthread@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "delthread@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -403,7 +403,7 @@ def test_export_thread_markdown():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "export@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "export@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -421,7 +421,7 @@ def test_delete_agent_cascades_threads():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "del@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "del@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 

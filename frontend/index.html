@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Minion AI — Train Your Personal Agent</title>
   <meta name="description" content="Personalize a multi-agent AI framework for your field, industry, and skills.">
-  <link rel="stylesheet" href="/css/style.css?v=57">
+  <link rel="stylesheet" href="/css/style.css?v=59">
 </head>
 <body>
   <header class="site-header" id="site-header">
@@ -383,6 +383,10 @@
             <p id="landing-auth-dev-hint" class="login-dev-hint hidden"></p>
             <div id="landing-auth-error"></div>
             <form id="landing-auth-form">
+              <div class="form-group form-group-compact auth-name-row hidden" id="landing-auth-names-wrap">
+                <input type="text" id="landing-auth-first-name" placeholder="First name" autocomplete="given-name">
+                <input type="text" id="landing-auth-last-name" placeholder="Last name" autocomplete="family-name">
+              </div>
               <div class="form-group form-group-compact">
                 <input type="email" id="landing-auth-email" required placeholder="Enter your email" autocomplete="email">
               </div>
@@ -768,6 +772,16 @@
           <p class="subtitle">Sign up free, then personalize your first agent.</p>
           <div id="register-error"></div>
           <form id="register-form">
+            <div class="form-group auth-name-row">
+              <div class="form-group-half">
+                <label for="register-first-name">First name</label>
+                <input type="text" id="register-first-name" required placeholder="First name" autocomplete="given-name">
+              </div>
+              <div class="form-group-half">
+                <label for="register-last-name">Last name</label>
+                <input type="text" id="register-last-name" required placeholder="Last name" autocomplete="family-name">
+              </div>
+            </div>
             <div class="form-group">
               <label for="register-email">Email</label>
               <input type="email" id="register-email" required placeholder="Enter your email" autocomplete="email">
@@ -1078,8 +1092,9 @@
         <button type="button" class="modal-close" id="account-modal-close" aria-label="Close">×</button>
       </div>
       <div class="modal-body" id="account-modal-body"></div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" id="account-modal-close-btn">Close</button>
+      <div class="modal-footer account-modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm hidden" id="account-modal-logout">Log out</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="account-modal-close-btn">Close</button>
       </div>
     </div>
   </div>
@@ -1167,7 +1182,7 @@
   <script src="/js/vendor/mermaid.min.js"></script>
   <script src="/js/markdown.js?v=1"></script>
   <script src="/js/background-wizard.js?v=17"></script>
-  <script src="/js/chat-workspace.js?v=56"></script>
-  <script src="/js/app.js?v=25"></script>
+  <script src="/js/chat-workspace.js?v=58"></script>
+  <script src="/js/app.js?v=26"></script>
 </body>
 </html>

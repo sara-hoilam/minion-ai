@@ -4,6 +4,16 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def local_auth_unless_supabase_tests(request, monkeypatch):
+    """Avoid live Supabase signup during generic tests when .env has keys configured."""
+    if request.module.__name__.endswith("test_supabase_auth"):
+        return
+    disabled = lambda: False
+    monkeypatch.setattr("backend.routes.auth.supabase_auth_enabled", disabled)
+    monkeypatch.setattr("backend.services.supabase_auth.supabase_auth_enabled", disabled)
+
+
+@pytest.fixture(autouse=True)
 def sync_chat_generation(monkeypatch):
     """Run chat generation inline so sqlite :memory: works in tests."""
 

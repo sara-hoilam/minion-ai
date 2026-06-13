@@ -4,7 +4,7 @@ from backend.app import create_app
 
 
 def _register(client):
-    client.post("/api/auth/register", json={"email": "prebuilt@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "prebuilt@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
 
 def test_prebuilt_catalog_lists_agents():

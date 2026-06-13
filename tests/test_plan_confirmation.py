@@ -69,7 +69,7 @@ def test_team_message_proposes_plan_before_execution():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "plan@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "plan@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -94,7 +94,7 @@ def test_confirm_plan_marks_proposal_confirmed():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "confirmed@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "confirmed@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 
@@ -119,7 +119,7 @@ def test_confirm_plan_starts_execution():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "confirm@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "confirm@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     thread = client.post("/api/chat/threads", json={"agent_session_id": session_id}).get_json()
 

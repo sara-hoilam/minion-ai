@@ -71,7 +71,7 @@ def test_create_agent_includes_first_principles_skill():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "fp@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "fp@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     client.post("/api/profile/background", json={
         "full_name": "Owner",
         "field": "Finance",

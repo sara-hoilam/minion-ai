@@ -9,6 +9,8 @@ def _register_and_background(client):
     r = client.post("/api/auth/register", json={
         "email": "analyst@test.com",
         "password": "securepass1",
+        "first_name": "Jane",
+        "last_name": "Analyst",
     })
     assert r.status_code == 201
 
@@ -132,6 +134,8 @@ def test_resume_upload_autofill():
         r = client.post("/api/auth/register", json={
             "email": "resume@test.com",
             "password": "securepass1",
+            "first_name": "Jane",
+            "last_name": "Analyst",
         })
         assert r.status_code == 201
 

@@ -2725,6 +2725,11 @@ const ChatWorkspace = (() => {
   }
 
   function accountDisplayName() {
+    const first = userProfile?.first_name?.trim();
+    const last = userProfile?.last_name?.trim();
+    if (first || last) return [first, last].filter(Boolean).join(" ");
+    const full = userProfile?.full_name?.trim();
+    if (full) return full;
     const email = accountEmail();
     if (!email) return "Account";
     const local = email.split("@")[0] || email;
@@ -2734,12 +2739,22 @@ const ChatWorkspace = (() => {
   }
 
   function accountFirstName() {
+    const first = userProfile?.first_name?.trim();
+    if (first) return first;
+    const full = userProfile?.full_name?.trim();
+    if (full) return full.split(/\s+/)[0] || "there";
     const email = accountEmail();
     if (!email) return "there";
     return accountDisplayName().split(" ")[0] || "there";
   }
 
   function accountInitial() {
+    const first = userProfile?.first_name?.trim();
+    const last = userProfile?.last_name?.trim();
+    if (first && last) return (first[0] + last[0]).toUpperCase();
+    if (first) return first[0].toUpperCase();
+    const display = accountDisplayName();
+    if (display && display !== "Account") return agentInitials(display);
     const email = accountEmail();
     if (!email) return "?";
     const local = email.split("@")[0] || email;
@@ -2773,8 +2788,15 @@ const ChatWorkspace = (() => {
     modal?.setAttribute("aria-hidden", "true");
   }
 
-  function bindAccountLogout(body) {
-    body.querySelector("#account-modal-logout")?.addEventListener("click", async () => {
+  function syncAccountModalFooter(showLogout = false) {
+    $("account-modal-logout")?.classList.toggle("hidden", !showLogout);
+  }
+
+  function bindAccountLogout() {
+    const btn = $("account-modal-logout");
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", async () => {
       try {
         await window.api("/auth/logout", { method: "POST" });
         window.location.href = "/";
@@ -2890,6 +2912,29 @@ const ChatWorkspace = (() => {
     const hasAccess = Boolean(sub?.access_granted);
     const planLabel = billing?.getCurrentPlanLabel?.() || "Free Plan";
     const nextPlan = billing?.getNextPlanTier?.();
+    const firstName = userProfile?.first_name?.trim() || "";
+    const lastName = userProfile?.last_name?.trim() || "";
+    const displayName = [firstName, lastName].filter(Boolean).join(" ") || accountDisplayName();
+
+    const nameSection = signedIn ? `
+        <section class="account-section">
+          <h4>Name</h4>
+          <div class="account-name-view" id="account-name-view">
+            <p class="account-value">${escapeHtml(displayName)}</p>
+            <button type="button" class="btn btn-secondary btn-sm" id="account-edit-name">Edit</button>
+          </div>
+          <form class="account-name-edit hidden" id="account-name-form">
+            <div class="account-name-fields">
+              <input type="text" id="account-first-name" value="${escapeHtml(firstName)}" placeholder="First name" autocomplete="given-name" required>
+              <input type="text" id="account-last-name" value="${escapeHtml(lastName)}" placeholder="Last name" autocomplete="family-name" required>
+            </div>
+            <div class="account-name-actions">
+              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="account-cancel-name">Cancel</button>
+            </div>
+          </form>
+          <div id="account-name-error"></div>
+        </section>` : "";
 
     let tokenSection = `
       <section class="account-section">
@@ -2949,6 +2994,7 @@ const ChatWorkspace = (() => {
 
     body.innerHTML = `
       <div class="account-panel">
+        ${nameSection}
         <section class="account-section">
           <h4>Sign in</h4>
           <div class="account-login-row">
@@ -2963,17 +3009,52 @@ const ChatWorkspace = (() => {
         ${upgradeSection}
         <div id="account-overview-message"></div>
         <div id="account-overview-error"></div>
-        ${showLogout ? `
-        <section class="account-section">
-          <button type="button" class="btn btn-secondary btn-sm" id="account-modal-logout">Log out</button>
-        </section>` : ""}
       </div>`;
+
+    syncAccountModalFooter(showLogout && signedIn);
+
+    body.querySelector("#account-edit-name")?.addEventListener("click", () => {
+      body.querySelector("#account-name-view")?.classList.add("hidden");
+      body.querySelector("#account-name-form")?.classList.remove("hidden");
+    });
+
+    body.querySelector("#account-cancel-name")?.addEventListener("click", () => {
+      body.querySelector("#account-name-form")?.classList.add("hidden");
+      body.querySelector("#account-name-view")?.classList.remove("hidden");
+      const errEl = body.querySelector("#account-name-error");
+      if (errEl) errEl.innerHTML = "";
+    });
+
+    body.querySelector("#account-name-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errEl = body.querySelector("#account-name-error");
+      const first = body.querySelector("#account-first-name")?.value?.trim() || "";
+      const last = body.querySelector("#account-last-name")?.value?.trim() || "";
+      if (!first || !last) {
+        if (errEl) errEl.innerHTML = `<div class="alert alert-error">First name and last name are required.</div>`;
+        return;
+      }
+      const saveBtn = body.querySelector("#account-name-form button[type='submit']");
+      if (saveBtn) saveBtn.disabled = true;
+      try {
+        await window.api("/profile", {
+          method: "PUT",
+          body: JSON.stringify({ first_name: first, last_name: last }),
+        });
+        userProfile = { ...(userProfile || {}), first_name: first, last_name: last, full_name: `${first} ${last}` };
+        updateUserFooter();
+        openAccountModal();
+      } catch (err) {
+        if (errEl) errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    });
 
     body.querySelector("#account-modal-signin")?.addEventListener("click", () => {
       closeAccountModal();
       window.showView?.("login");
     });
-    bindAccountLogout(body);
 
     body.querySelector("#account-view-plans")?.addEventListener("click", () => {
       accountModalView = "payment";
@@ -3033,6 +3114,7 @@ const ChatWorkspace = (() => {
 
     if (accountModalView === "payment") {
       renderAccountPayment(body);
+      syncAccountModalFooter(false);
     } else {
       renderAccountOverview(body);
     }
@@ -3169,6 +3251,7 @@ const ChatWorkspace = (() => {
     $("account-modal-close")?.addEventListener("click", closeAccountModal);
     $("account-modal-close-btn")?.addEventListener("click", closeAccountModal);
     $("account-modal-backdrop")?.addEventListener("click", closeAccountModal);
+    bindAccountLogout();
 
     $("profile-modal-close")?.addEventListener("click", () => $("profile-modal")?.classList.add("hidden"));
     $("profile-modal-backdrop")?.addEventListener("click", () => $("profile-modal")?.classList.add("hidden"));

@@ -12,7 +12,7 @@ def test_jd_draft_endpoint():
     })
     client = app.test_client()
 
-    client.post("/api/auth/register", json={"email": "val@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "val@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
     r = client.post("/api/agents/jd-draft", json={
         "full_name": "Ops Bot",
@@ -37,7 +37,7 @@ def test_framework_preview_skill_based():
     })
     client = app.test_client()
 
-    client.post("/api/auth/register", json={"email": "fw@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "fw@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
     jd = {
         "title": "Analyst — Data Bot",
@@ -78,7 +78,7 @@ def test_framework_preview_uses_edited_jd():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "edit@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "edit@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
     jd = {
         "title": "Custom Editor Title — My Bot",
@@ -121,7 +121,7 @@ def test_framework_preview_job_returns_progress():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "job@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "job@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
     jd = {
         "title": "Analyst — Job Bot",
@@ -168,7 +168,7 @@ def test_create_agent_writes_named_skill_and_framework_files():
     })
     client = app.test_client()
 
-    client.post("/api/auth/register", json={"email": "agent@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "agent@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     client.post("/api/profile/background", json={
         "full_name": "Finance Bot",
         "field": "Finance",
@@ -237,7 +237,7 @@ def test_update_agent_skills_rebuilds_framework():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "skills@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "skills@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
     jd = {
         "title": "Analyst — Riley",
@@ -288,7 +288,7 @@ def test_framework_preview_rejects_excess_skills():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "cap@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "cap@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
     jd = {
         "title": "Analyst — Cap Bot",
@@ -314,7 +314,7 @@ def test_framework_preview_accepts_updated_skillset():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "skills@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "skills@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
     jd = {
         "title": "Analyst — Skills Bot",

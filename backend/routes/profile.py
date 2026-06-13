@@ -10,6 +10,7 @@ from backend.config import UPLOAD_FOLDER
 from backend.models import db
 from backend.services.event_logger import log_event
 from backend.services.field_catalog import catalog_payload
+from backend.services.profile_names import apply_profile_names, profile_name_parts
 from backend.services.resume_parser import parse_resume
 
 profile_bp = Blueprint("profile", __name__, url_prefix="/api/profile")
@@ -39,8 +40,14 @@ def _save_profile(data: dict, mark_completed: bool):
     if not profile:
         return jsonify({"error": "Profile not found"}), 404
 
-    if "full_name" in data:
+    if "first_name" in data or "last_name" in data:
+        apply_profile_names(profile, data.get("first_name"), data.get("last_name"))
+    elif "full_name" in data:
         profile.full_name = data.get("full_name")
+        if profile.full_name and not profile.first_name and not profile.last_name:
+            parts = profile.full_name.split(None, 1)
+            profile.first_name = parts[0]
+            profile.last_name = parts[1] if len(parts) > 1 else ""
     if "field" in data:
         profile.field = data.get("field")
     if "skillset" in data:
@@ -237,7 +244,10 @@ def download_resume():
 
 
 def _profile_dict(profile) -> dict:
+    first, last = profile_name_parts(profile)
     return {
+        "first_name": first or None,
+        "last_name": last or None,
         "full_name": profile.full_name,
         "field": profile.field,
         "skillset": profile.skillset,

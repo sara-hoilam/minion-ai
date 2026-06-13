@@ -12,7 +12,7 @@ def test_home_dashboard_with_persona():
     })
     client = app.test_client()
 
-    client.post("/api/auth/register", json={"email": "home@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "home@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     client.post("/api/profile/background", json={
         "full_name": "Jane Analyst",
         "field": "Data Analytics",

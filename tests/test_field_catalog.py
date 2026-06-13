@@ -22,7 +22,7 @@ def test_create_agent_stores_context():
     })
     client = app.test_client()
 
-    client.post("/api/auth/register", json={"email": "multi@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "multi@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     client.post("/api/profile/background", json={
         "full_name": "Marketing Bot",
         "field": "Marketing",

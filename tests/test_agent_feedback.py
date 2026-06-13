@@ -59,7 +59,7 @@ def test_submit_dm_agent_feedback_api():
         "TESTING": True,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "dmfb@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "dmfb@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
 
     res = client.post(
@@ -83,7 +83,7 @@ def test_submit_feedback_api():
         "TESTING": True,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "feedback@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "feedback@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
 
     project = client.post("/api/projects", json={

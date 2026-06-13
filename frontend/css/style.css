@@ -5568,6 +5568,67 @@ body.home-workspace .collab-shell {
   margin-top: 0.35rem;
 }
 
+.account-modal-footer {
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-modal-footer #account-modal-logout {
+  margin-right: auto;
+}
+
+.account-modal-footer .btn {
+  min-width: 5.25rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.auth-name-row {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.auth-name-row input,
+.form-group.auth-name-row .form-group-half {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-group.auth-name-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.form-group-half {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.account-name-fields {
+  display: flex;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.account-name-fields input {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .plan-proposal-confirmed {
   border-top: none;
   padding-top: 0;

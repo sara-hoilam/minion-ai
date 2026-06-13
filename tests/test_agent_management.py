@@ -48,7 +48,7 @@ def test_rename_agent():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "rename@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "rename@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
 
     r = client.put(f"/api/agents/{session_id}", json={"full_name": "Sara"})
@@ -68,7 +68,7 @@ def test_get_agent():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "get@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "get@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
 
     r = client.get(f"/api/agents/{session_id}")
@@ -84,7 +84,7 @@ def test_delete_agent():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "del@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "del@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
 
     r = client.delete(f"/api/agents/{session_id}")
@@ -102,7 +102,7 @@ def test_hide_agent_from_roster():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "hide@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "hide@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     session_id = _create_agent(client)
     client.post("/api/chat/threads", json={"agent_session_id": session_id})
 

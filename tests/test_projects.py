@@ -44,7 +44,7 @@ def _app_client():
         "TESTING": True,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "projects@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "projects@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     return app, client
 
 

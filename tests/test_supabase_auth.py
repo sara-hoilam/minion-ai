@@ -14,8 +14,10 @@ def test_register_uses_supabase_when_configured(monkeypatch):
     })
     client = app.test_client()
 
-    def fake_sign_up(email, password):
+    def fake_sign_up(email, password, *, first_name="", last_name=""):
         assert email == "new@test.com"
+        assert first_name == "Jane"
+        assert last_name == "Doe"
         return SupabaseAuthResult(
             supabase_user_id="11111111-1111-1111-1111-111111111111",
             email=email,
@@ -30,12 +32,16 @@ def test_register_uses_supabase_when_configured(monkeypatch):
     r = client.post("/api/auth/register", json={
         "email": "new@test.com",
         "password": "securepass1",
+        "first_name": "Jane",
+        "last_name": "Doe",
     })
     assert r.status_code == 201
     with app.app_context():
         user = User.query.filter_by(email="new@test.com").first()
         assert user is not None
         assert user.supabase_auth_id == "11111111-1111-1111-1111-111111111111"
+        assert user.profile.first_name == "Jane"
+        assert user.profile.last_name == "Doe"
 
 
 def test_login_uses_supabase_when_configured(monkeypatch):
@@ -105,9 +111,50 @@ def test_register_rejects_password_mismatch():
         "email": "new@test.com",
         "password": "securepass1",
         "password_confirm": "different1",
+        "first_name": "Test",
+        "last_name": "User",
     })
     assert r.status_code == 400
     assert "match" in r.get_json()["error"].lower()
+
+
+def test_register_requires_names():
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "DISABLE_AUTH": False,
+    })
+    client = app.test_client()
+    r = client.post("/api/auth/register", json={
+        "email": "new@test.com",
+        "password": "securepass1",
+    })
+    assert r.status_code == 400
+    assert "name" in r.get_json()["error"].lower()
+
+
+def test_register_saves_names_locally():
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "DISABLE_AUTH": False,
+        "SUPABASE_URL": "",
+        "SUPABASE_ANON_KEY": "",
+    })
+    client = app.test_client()
+    r = client.post("/api/auth/register", json={
+        "email": "local@test.com",
+        "password": "securepass1",
+        "first_name": "Alex",
+        "last_name": "Smith",
+    })
+    assert r.status_code == 201
+    with app.app_context():
+        user = User.query.filter_by(email="local@test.com").first()
+        assert user.profile.first_name == "Alex"
+        assert user.profile.last_name == "Smith"
+        assert user.profile.full_name == "Alex Smith"
+    me = client.get("/api/auth/me").get_json()
+    assert me["profile"]["first_name"] == "Alex"
+    assert me["profile"]["last_name"] == "Smith"
 
 
 def test_reset_password_syncs_user_and_logs_in(monkeypatch):

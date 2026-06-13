@@ -12,7 +12,7 @@ def test_profile_edit_and_resume_actions():
     })
     client = app.test_client()
 
-    client.post("/api/auth/register", json={"email": "edit@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "edit@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     client.post("/api/profile/background", json={
         "full_name": "Jane Analyst",
         "field": "Data Analytics",

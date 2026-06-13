@@ -161,6 +161,23 @@ function validateRegisterPasswords(password, confirmPassword, errorContainerId) 
   return true;
 }
 
+function validateRegisterNames(firstName, lastName, errorContainerId) {
+  if (!firstName?.trim() || !lastName?.trim()) {
+    showError(errorContainerId, "First name and last name are required.");
+    return false;
+  }
+  return true;
+}
+
+function registerNamePayload(prefix = "") {
+  const firstEl = document.getElementById(`${prefix}first-name`);
+  const lastEl = document.getElementById(`${prefix}last-name`);
+  return {
+    first_name: firstEl?.value?.trim() || "",
+    last_name: lastEl?.value?.trim() || "",
+  };
+}
+
 function redirectToRegister(email, { preferLanding = false } = {}) {
   const onLanding = preferLanding
     || !document.querySelector('[data-view="landing"]')?.classList.contains("hidden");
@@ -194,6 +211,9 @@ function setLandingAuthMode(mode) {
   const confirmWrap = document.getElementById("landing-auth-confirm-wrap");
   const confirmInput = document.getElementById("landing-auth-password-confirm");
   const forgotWrap = document.getElementById("landing-auth-forgot-wrap");
+  const namesWrap = document.getElementById("landing-auth-names-wrap");
+  const firstNameInput = document.getElementById("landing-auth-first-name");
+  const lastNameInput = document.getElementById("landing-auth-last-name");
 
   if (submitBtn) submitBtn.textContent = isLogin ? "Continue with email" : "Create account";
   if (toggleBtn) toggleBtn.textContent = isLogin ? "Sign up" : "Log in";
@@ -203,8 +223,15 @@ function setLandingAuthMode(mode) {
     passwordInput.minLength = isLogin ? 0 : 8;
     passwordInput.autocomplete = isLogin ? "current-password" : "new-password";
   }
+  namesWrap?.classList.toggle("hidden", isLogin);
   confirmWrap?.classList.toggle("hidden", isLogin);
   forgotWrap?.classList.toggle("hidden", !isLogin);
+  if (firstNameInput) firstNameInput.required = !isLogin;
+  if (lastNameInput) lastNameInput.required = !isLogin;
+  if (isLogin) {
+    if (firstNameInput) firstNameInput.value = "";
+    if (lastNameInput) lastNameInput.value = "";
+  }
   if (confirmInput) {
     confirmInput.required = !isLogin;
     if (isLogin) confirmInput.value = "";
@@ -276,10 +303,18 @@ document.getElementById("landing-auth-form")?.addEventListener("submit", async (
     }
     if (landingAuthMode === "register") {
       const confirmPassword = document.getElementById("landing-auth-password-confirm")?.value || "";
+      const names = registerNamePayload("landing-auth-");
+      if (!validateRegisterNames(names.first_name, names.last_name, "landing-auth-error")) return;
       if (!validateRegisterPasswords(password, confirmPassword, "landing-auth-error")) return;
       await api("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ email, password, password_confirm: confirmPassword }),
+        body: JSON.stringify({
+          email,
+          password,
+          password_confirm: confirmPassword,
+          first_name: names.first_name,
+          last_name: names.last_name,
+        }),
       });
       trackEvent("signup_completed");
     } else {
@@ -329,6 +364,8 @@ document.getElementById("register-form")?.addEventListener("submit", async (e) =
     }
     const password = document.getElementById("register-password").value;
     const confirmPassword = document.getElementById("register-password-confirm").value;
+    const names = registerNamePayload("register-");
+    if (!validateRegisterNames(names.first_name, names.last_name, "register-error")) return;
     if (!validateRegisterPasswords(password, confirmPassword, "register-error")) return;
     const res = await api("/auth/register", {
       method: "POST",
@@ -336,6 +373,8 @@ document.getElementById("register-form")?.addEventListener("submit", async (e) =
         email: document.getElementById("register-email").value,
         password,
         password_confirm: confirmPassword,
+        first_name: names.first_name,
+        last_name: names.last_name,
       }),
     });
     if (res.email_confirmation_required) {

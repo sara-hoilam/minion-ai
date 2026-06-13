@@ -59,7 +59,7 @@ def test_thread_memory_api():
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "memapi@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "memapi@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
 
     with app.app_context():
         from backend.models import ThreadTopic

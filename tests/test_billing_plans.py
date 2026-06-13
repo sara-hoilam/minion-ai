@@ -153,7 +153,7 @@ def test_post_message_returns_402_without_subscription():
         "SUPABASE_URL": "",
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "blocked@test.com", "password": "securepass1"})
+    client.post("/api/auth/register", json={"email": "blocked@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     client.post("/api/profile/background", json={
         "full_name": "Blocked",
         "field": "Finance",

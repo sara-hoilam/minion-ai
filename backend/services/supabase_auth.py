@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 from flask import current_app, session
 
 from backend.models import User, UserProfile, db
+from backend.services.profile_names import apply_profile_names, normalize_name_part, profile_name_parts
 
 SUPABASE_MANAGED_PASSWORD = ""
 
@@ -84,7 +85,48 @@ def clear_session_tokens() -> None:
     session.pop("supabase_refresh_token", None)
 
 
-def sync_local_user(supabase_user_id: str, email: str) -> User:
+def _names_from_auth_user(auth_user: dict | None) -> tuple[str, str]:
+    if not auth_user:
+        return "", ""
+    meta = auth_user.get("user_metadata") or auth_user.get("raw_user_meta_data") or {}
+    return (
+        normalize_name_part(meta.get("first_name")),
+        normalize_name_part(meta.get("last_name")),
+    )
+
+
+def _ensure_profile_names(
+    profile: UserProfile | None,
+    *,
+    first_name: str = "",
+    last_name: str = "",
+    email: str = "",
+) -> None:
+    if not profile:
+        return
+    existing_first, existing_last = profile_name_parts(profile)
+    if existing_first and existing_last:
+        return
+    first = first_name or existing_first
+    last = last_name or existing_last
+    if (not first or not last) and email:
+        try:
+            meta_first, meta_last = _names_from_auth_user(find_supabase_auth_user(email))
+            first = first or meta_first
+            last = last or meta_last
+        except Exception:
+            pass
+    if first or last:
+        apply_profile_names(profile, first or None, last or None)
+
+
+def sync_local_user(
+    supabase_user_id: str,
+    email: str,
+    *,
+    first_name: str = "",
+    last_name: str = "",
+) -> User:
     """Link Supabase auth.users to the app users row (create profile if new)."""
     email = email.strip().lower()
     auth_id = _normalize_uuid(supabase_user_id)
@@ -98,6 +140,13 @@ def sync_local_user(supabase_user_id: str, email: str) -> User:
             user.password_hash = SUPABASE_MANAGED_PASSWORD
         if not user.profile:
             db.session.add(UserProfile(user_id=user.id))
+        db.session.flush()
+        _ensure_profile_names(
+            user.profile,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+        )
         db.session.commit()
         return user
 
@@ -108,16 +157,36 @@ def sync_local_user(supabase_user_id: str, email: str) -> User:
     )
     db.session.add(user)
     db.session.flush()
-    db.session.add(UserProfile(user_id=user.id))
+    profile = UserProfile(user_id=user.id)
+    db.session.add(profile)
+    db.session.flush()
+    _ensure_profile_names(
+        profile,
+        first_name=first_name,
+        last_name=last_name,
+        email=email,
+    )
     db.session.commit()
     return user
 
 
-def sign_up(email: str, password: str) -> SupabaseAuthResult:
-    payload = _request("POST", "/signup", body={
+def sign_up(
+    email: str,
+    password: str,
+    *,
+    first_name: str = "",
+    last_name: str = "",
+) -> SupabaseAuthResult:
+    body: dict = {
         "email": email.strip().lower(),
         "password": password,
-    })
+    }
+    if first_name or last_name:
+        body["data"] = {
+            "first_name": normalize_name_part(first_name),
+            "last_name": normalize_name_part(last_name),
+        }
+    payload = _request("POST", "/signup", body=body)
     user = payload.get("user") or {}
     user_email = (user.get("email") or email).lower()
     user_id = user.get("id")

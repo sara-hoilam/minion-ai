@@ -50,5 +50,5 @@ def test_migrate_legacy_db_without_resume_columns(tmp_path):
     assert "resume_uploaded_at" in cols
 
     client = app.test_client()
-    r = client.post("/api/auth/register", json={"email": "legacy@test.com", "password": "securepass1"})
+    r = client.post("/api/auth/register", json={"email": "legacy@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
     assert r.status_code == 201

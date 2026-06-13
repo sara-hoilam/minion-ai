@@ -53,6 +53,8 @@ class UserProfile(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False)
+    first_name = db.Column(db.String(100))
+    last_name = db.Column(db.String(100))
     full_name = db.Column(db.String(255))
     field = db.Column(db.String(100))
     skillset = db.Column(db.Text)

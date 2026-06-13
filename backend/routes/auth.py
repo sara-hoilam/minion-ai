@@ -4,6 +4,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from backend.models import User, UserProfile, db
 from backend.services.dev_auth import DEMO_EMAIL, login_demo_user
 from backend.services.event_logger import log_event
+from backend.services.profile_names import apply_profile_names, normalize_name_part, profile_name_parts
 from backend.services.supabase_auth import (
     auth_user_exists,
     clear_session_tokens,
@@ -29,16 +30,39 @@ def _login_local_user(user: User) -> None:
     g.current_user_id = user.id
 
 
+def _profile_payload(profile: UserProfile | None) -> dict | None:
+    if not profile:
+        return None
+    first, last = profile_name_parts(profile)
+    return {
+        "first_name": first or None,
+        "last_name": last or None,
+        "full_name": profile.full_name,
+        "field": profile.field,
+        "skillset": profile.skillset,
+        "current_job": profile.current_job,
+        "years_experience": profile.years_experience,
+        "industry": profile.industry,
+        "completed_background": profile.completed_background,
+        "has_resume": bool(profile.resume_file_path),
+        "resume_original_name": profile.resume_original_name,
+    }
+
+
 @auth_bp.route("/register", methods=["POST"])
 def register():
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
+    first_name = normalize_name_part(data.get("first_name"))
+    last_name = normalize_name_part(data.get("last_name"))
 
     password_confirm = data.get("password_confirm") or ""
 
     if not email or not password:
         return jsonify({"error": "Email and password required"}), 400
+    if not first_name or not last_name:
+        return jsonify({"error": "First name and last name are required"}), 400
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
     if password_confirm and password != password_confirm:
@@ -67,7 +91,7 @@ def register():
             return jsonify({"error": "Email already registered. Log in instead."}), 409
 
         try:
-            result = supabase_sign_up(email, password)
+            result = supabase_sign_up(email, password, first_name=first_name, last_name=last_name)
         except Exception as exc:
             msg = str(exc).lower()
             if "already" in msg or "registered" in msg or "exists" in msg:
@@ -81,7 +105,12 @@ def register():
                 "email_confirmation_required": True,
             }), 201
 
-        user = sync_local_user(result.supabase_user_id, result.email)
+        user = sync_local_user(
+            result.supabase_user_id,
+            result.email,
+            first_name=first_name,
+            last_name=last_name,
+        )
         store_session_tokens(result.access_token, result.refresh_token)
         _login_local_user(user)
         log_event("user_registered", {"email": email, "auth": "supabase"})
@@ -94,7 +123,9 @@ def register():
     user.set_password(password)
     db.session.add(user)
     db.session.flush()
-    db.session.add(UserProfile(user_id=user.id))
+    profile = UserProfile(user_id=user.id)
+    apply_profile_names(profile, first_name, last_name)
+    db.session.add(profile)
     db.session.commit()
 
     _login_local_user(user)
@@ -244,15 +275,5 @@ def me():
         "email": current_user.email,
         "subscription_status": current_user.subscription_status,
         "auth_provider": "supabase" if current_user.uses_supabase_auth else "local",
-        "profile": {
-            "full_name": profile.full_name if profile else None,
-            "field": profile.field if profile else None,
-            "skillset": profile.skillset if profile else None,
-            "current_job": profile.current_job if profile else None,
-            "years_experience": profile.years_experience if profile else None,
-            "industry": profile.industry if profile else None,
-            "completed_background": profile.completed_background if profile else False,
-            "has_resume": bool(profile.resume_file_path) if profile else False,
-            "resume_original_name": profile.resume_original_name if profile else None,
-        } if profile else None,
+        "profile": _profile_payload(profile),
     })

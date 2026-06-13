@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify
 from flask_login import login_required, current_user
 
 from backend.models import AgentArtifact, StudioSession, TaskResponse
+from backend.services.profile_names import profile_name_parts
 from backend.services.studio_tasks import resolve_studio_for_field
 
 home_bp = Blueprint("home", __name__, url_prefix="/api/home")
@@ -170,7 +171,10 @@ def get_home():
 
     user_info = None
     if profile:
+        first_name, last_name = profile_name_parts(profile)
         user_info = {
+            "first_name": first_name or None,
+            "last_name": last_name or None,
             "full_name": profile.full_name,
             "email": current_user.email,
             "field": profile.field,

@@ -30,15 +30,17 @@ def migrate_db() -> None:
             col_type = "VARCHAR(36)" if db.engine.dialect.name == "sqlite" else "UUID"
             db.session.execute(text(f"ALTER TABLE users ADD COLUMN supabase_auth_id {col_type}"))
 
-    if "user_profiles" in tables:
-        cols = {c["name"] for c in inspector.get_columns("user_profiles")}
-        for col, col_type in [
-            ("resume_file_path", "VARCHAR(500)"),
-            ("resume_original_name", "VARCHAR(255)"),
-            ("resume_uploaded_at", "DATETIME"),
-        ]:
-            if col not in cols:
-                db.session.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {col} {col_type}"))
+        if "user_profiles" in tables:
+            cols = {c["name"] for c in inspector.get_columns("user_profiles")}
+            for col, col_type in [
+                ("resume_file_path", "VARCHAR(500)"),
+                ("resume_original_name", "VARCHAR(255)"),
+                ("resume_uploaded_at", "DATETIME"),
+                ("first_name", "VARCHAR(100)"),
+                ("last_name", "VARCHAR(100)"),
+            ]:
+                if col not in cols:
+                    db.session.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {col} {col_type}"))
 
     if "studio_sessions" in tables:
         cols = {c["name"] for c in inspector.get_columns("studio_sessions")}
