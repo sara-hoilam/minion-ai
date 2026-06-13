@@ -1450,6 +1450,48 @@ function formatPlanDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function getPlanUsage(sub) {
+  if (!sub?.access_granted) return null;
+  const usedUsd = Number(sub.token_used_usd ?? 0);
+  const planPriceUsd = Number(sub.price_usd ?? 0);
+  const pct = planPriceUsd > 0 ? Math.min(100, (usedUsd / planPriceUsd) * 100) : 0;
+  return { usedUsd, planPriceUsd, pct };
+}
+
+function formatUsagePercentValue(pct) {
+  const n = Number(pct || 0);
+  if (n >= 100) return "100%";
+  if (n > 0 && n < 0.1) return "< 0.1%";
+  if (n >= 10) return `${Math.round(n)}%`;
+  return `${n.toFixed(1)}%`;
+}
+
+function renderUsageMeterHtml(sub, { compact = false, periodEnd = null } = {}) {
+  const usage = getPlanUsage(sub);
+  if (!usage) return "";
+  const pctLabel = formatUsagePercentValue(usage.pct);
+  const fillWidth = Math.max(usage.pct > 0 ? 2 : 0, usage.pct);
+  const periodNote = periodEnd
+    ? `Resets ${formatPlanDate(periodEnd)}`
+    : "Monthly allowance — unused usage does not roll over.";
+  const detail = compact
+    ? ""
+    : `<p class="account-muted account-usage-detail">${escapeHtml(formatUsd(usage.usedUsd))} of ${escapeHtml(formatUsd(usage.planPriceUsd))} plan</p>`;
+
+  return `
+    <div class="account-usage-meter${compact ? " account-usage-meter-compact" : ""}">
+      <div class="account-usage-head">
+        <p class="account-usage-percent">${escapeHtml(pctLabel)}</p>
+        <span class="account-usage-label">used this period</span>
+      </div>
+      <div class="account-token-bar" role="progressbar" aria-valuenow="${usage.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Plan usage">
+        <div class="account-token-fill" style="width:${fillWidth}%"></div>
+      </div>
+      ${detail}
+      <p class="account-muted">${periodNote}</p>
+    </div>`;
+}
+
 async function loadBillingData() {
   billingConfig = await api("/billing/config");
   if (currentUser) {
@@ -1536,9 +1578,9 @@ function renderPlansUsage() {
     return;
   }
 
-  const used = Number(sub.token_used_count ?? sub.token_used_usd ?? 0);
-  const budget = Number(sub.token_budget_count ?? sub.token_budget_usd ?? 0);
-  const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
+  const usage = getPlanUsage(sub);
+  const pct = usage?.pct ?? 0;
+  const fillWidth = Math.max(pct > 0 ? 2 : 0, pct);
   const cancelNote = sub.cancel_at_period_end
     ? `<p class="plans-usage-cancel">Cancels on ${formatPlanDate(sub.current_period_end)}</p>`
     : "";
@@ -1548,9 +1590,10 @@ function renderPlansUsage() {
     <p class="plans-usage-title">Current plan — ${escapeHtml(sub.plan_name || sub.plan_id || "Active")}</p>
     <div class="plans-usage-row">
       <div class="plans-usage-stat">
-        <div>Token usage</div>
-        <strong>${escapeHtml(formatTokenCount(used))} / ${escapeHtml(formatTokenCount(budget))}</strong>
-        <div class="plans-usage-bar"><div class="plans-usage-bar-fill" style="width:${pct}%"></div></div>
+        <div>Plan usage</div>
+        <strong>${escapeHtml(formatUsagePercentValue(pct))}</strong>
+        <div class="plans-usage-bar"><div class="plans-usage-bar-fill" style="width:${fillWidth}%"></div></div>
+        <div class="plans-usage-detail">${escapeHtml(formatUsd(usage.usedUsd))} of ${escapeHtml(formatUsd(usage.planPriceUsd))} plan</div>
       </div>
       <div class="plans-usage-stat">
         <div>Billing period ends</div>
@@ -1823,6 +1866,9 @@ async function bootstrap() {
     formatTokenCount,
     formatPlanTokenAllowance,
     formatPlanDate,
+    getPlanUsage,
+    formatUsagePercentValue,
+    renderUsageMeterHtml,
     getCurrentPlanLabel,
     getFreePlanLabel: () => FREE_PLAN_LABEL,
     getNextPlanTier,

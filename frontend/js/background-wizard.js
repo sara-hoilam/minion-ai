@@ -695,96 +695,6 @@ const BackgroundWizard = (() => {
 
   function renderFrameworkStep() {
     const preview = state.frameworkPreview;
-    const fw = preview?.framework || {};
-    const questions = preview?.construction_questions || [];
-    const jdUsed = preview?.job_description_used || state.jdDraft || {};
-
-    const manager = fw.manager || (fw.agents || []).find((a) => a.id === "manager" || a.type === "manager");
-    const skillAgents = (fw.agents || []).filter((a) => a.id !== "manager" && a.type !== "manager");
-    const breakdown = fw.skill_breakdown || [];
-    const interactions = fw.interactions || [];
-
-    const breakdownHtml = breakdown.map((b) => `
-      <li>
-        <strong>${escapeHtml(b.skill)}</strong>
-        <span class="skill-breakdown-rationale">${escapeHtml(b.rationale || "")}</span>
-      </li>
-    `).join("");
-
-    const managerHtml = manager ? `
-      <div class="framework-agent-card framework-manager-card">
-        <strong>${escapeHtml(manager.role || "Manager Agent")}</strong>
-        <p>${escapeHtml(manager.description || manager.focus || "Distributes tasks and evaluates skill agent outputs.")}</p>
-      </div>
-    ` : "";
-
-    const agentsHtml = skillAgents.map((a) => `
-      <div class="framework-agent-card">
-        <strong>${escapeHtml(a.skill || a.role || a.id)}</strong>
-        <p class="framework-agent-role">${escapeHtml(a.role || "")}</p>
-        <p>${escapeHtml(a.focus || "")}</p>
-      </div>
-    `).join("");
-
-    const interactionsHtml = interactions.map((i) => `
-      <li class="framework-interaction">
-        <code>${escapeHtml(i.from || "")}</code>
-        <span aria-hidden="true">→</span>
-        <code>${escapeHtml(i.to || "")}</code>
-        <span class="interaction-type">${escapeHtml(i.type || "")}</span>
-        <span class="interaction-desc">${escapeHtml(i.description || "")}</span>
-      </li>
-    `).join("");
-
-    const rulesHtml = (fw.orchestrator?.routing_rules || []).map((r) => `
-      <li>${escapeHtml(r.intent || "")} → <code>${escapeHtml(r.agent || "")}</code></li>
-    `).join("");
-
-    const jdRespHtml = (jdUsed.responsibilities || []).map((r) => `<li>${escapeHtml(r)}</li>`).join("");
-
-    const questionsHtml = questions.length ? `
-      <section class="validation-block">
-        <h3 class="validation-heading">Clarifications needed</h3>
-        <p class="validation-hint">Choose A, B, C, or D — or type your own answer.</p>
-        ${questions.map((q) => {
-          const answer = normalizeConstructionAnswer(state.constructionAnswers[q.id]);
-          const options = q.options || [];
-          const choicesHtml = options.map((opt) => `
-            <button
-              type="button"
-              class="validation-choice construction-choice${answer.choice === opt.id ? " selected" : ""}"
-              data-qid="${escapeHtml(q.id)}"
-              data-choice="${escapeHtml(opt.id)}"
-            ><strong>${escapeHtml(opt.id)}.</strong> ${escapeHtml(opt.label)}</button>
-          `).join("");
-          const manualSelected = answer.choice === "manual";
-          return `
-          <div class="validation-question">
-            <p class="validation-assumption">${escapeHtml(q.context)}</p>
-            <p class="validation-question-text">${escapeHtml(q.question)}</p>
-            <div class="validation-choice-row">${choicesHtml}</div>
-            ${q.allow_manual !== false ? `
-              <button
-                type="button"
-                class="validation-choice construction-choice${manualSelected ? " selected" : ""}"
-                data-qid="${escapeHtml(q.id)}"
-                data-choice="manual"
-              ><strong>Other</strong> — type your own</button>
-              <div class="construction-manual-wrap${manualSelected ? "" : " hidden"}" data-qid="${escapeHtml(q.id)}">
-                <textarea
-                  class="construction-manual validation-response"
-                  data-qid="${escapeHtml(q.id)}"
-                  rows="2"
-                  placeholder="${escapeHtml(q.manual_placeholder || "Type your answer...")}"
-                >${escapeHtml(answer.manual_text)}</textarea>
-              </div>
-            ` : ""}
-          </div>
-        `;
-        }).join("")}
-      </section>
-    ` : "";
-
     const skillCount = allSkills().length;
 
     els.body.innerHTML = `
@@ -796,39 +706,8 @@ const BackgroundWizard = (() => {
         <div id="framework-skills-bubbles" class="framework-skills-bubbles"></div>
         ${renderFrameworkSkillsCustomInputHtml()}
       </section>
-      <section class="validation-block">
-        <h3 class="validation-heading">Confirmed job description</h3>
-        <p class="validation-jd-title">${escapeHtml(jdUsed.title || "")}</p>
-        <p class="validation-jd-summary">${escapeHtml(jdUsed.summary || "")}</p>
-        ${jdRespHtml ? `<ul class="validation-list">${jdRespHtml}</ul>` : ""}
-      </section>
-      <p class="validation-intro">${escapeHtml(fw.orchestrator?.description || "Skill-based framework with a Manager Agent and skill specialists.")}</p>
-      ${breakdown.length ? `
-        <section class="validation-block">
-          <h3 class="validation-heading">Skills required for this JD</h3>
-          <ul class="validation-list skill-breakdown-list">${breakdownHtml}</ul>
-        </section>
-      ` : ""}
-      <section class="validation-block">
-        <h3 class="validation-heading">Manager Agent</h3>
-        <div class="framework-agents-grid">${managerHtml}</div>
-      </section>
-      <section class="validation-block">
-        <h3 class="validation-heading">Skill agents</h3>
-        <p class="validation-hint">Each skill agent gets a skill.md specification when your agent is created.</p>
-        <div class="framework-agents-grid">${agentsHtml}</div>
-      </section>
-      ${interactionsHtml ? `
-        <section class="validation-block">
-          <h3 class="validation-heading">How agents interact</h3>
-          <ul class="validation-list framework-interaction-list">${interactionsHtml}</ul>
-        </section>
-      ` : ""}
-      ${rulesHtml ? `<section class="validation-block"><h3 class="validation-heading">Routing</h3><ul class="validation-list">${rulesHtml}</ul></section>` : ""}
-      ${questionsHtml}
     `;
     attachFrameworkSkillsHandlers();
-    attachConstructionQuestionHandlers();
   }
 
   async function loadJdDraft() {
@@ -1074,14 +953,6 @@ const BackgroundWizard = (() => {
       if (allSkills().length === 0) return "Select or add at least one skill.";
       if (state.frameworkLoading || !state.frameworkPreview) {
         return "Framework is still being designed — please wait.";
-      }
-      syncConstructionAnswersFromDOM();
-      const required = state.frameworkPreview?.construction_questions || [];
-      for (const q of required) {
-        const text = constructionAnswerText(q, state.constructionAnswers[q.id]);
-        if (!text) {
-          return "Please select A, B, C, or D — or type your own answer for each clarification.";
-        }
       }
     }
     return null;

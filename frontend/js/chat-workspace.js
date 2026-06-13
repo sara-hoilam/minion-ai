@@ -26,6 +26,7 @@ const ChatWorkspace = (() => {
   let projectInstructionsTimer = null;
   let editingProjectId = null;
   let userProfile = null;
+  const planRevisionSubmitted = new Map();
 
   function $(id) { return document.getElementById(id); }
 
@@ -1211,7 +1212,17 @@ const ChatWorkspace = (() => {
         scrollToBottom();
         await loadSidebar();
         if (window.Billing?.load) {
-          window.Billing.load().catch(() => {});
+          await window.Billing.load().catch(() => {});
+        }
+        const accountModal = $("account-modal");
+        const accountBody = $("account-modal-body");
+        if (
+          accountModal
+          && !accountModal.classList.contains("hidden")
+          && accountBody
+          && accountModalView !== "payment"
+        ) {
+          renderAccountOverview(accountBody);
         }
         stopThreadPoll();
       } catch {
@@ -2078,6 +2089,7 @@ const ChatWorkspace = (() => {
       return "";
     }
     const msgId = msg.id || "latest";
+    const submittedRevision = (meta.revision_submitted || planRevisionSubmitted.get(String(msgId)) || "").trim();
     if (meta.confirmed) {
       return `
         <div class="plan-proposal-actions plan-proposal-confirmed" data-plan-msg="${msgId}">
@@ -2087,18 +2099,26 @@ const ChatWorkspace = (() => {
     if (!currentThread?.pending_plan) {
       return "";
     }
+    const revisionSubmittedHtml = submittedRevision
+      ? `<p class="plan-revision-submitted">Revision submitted: ${escapeHtml(submittedRevision)}</p>`
+      : "";
+    const reviseFormHtml = submittedRevision
+      ? ""
+      : `
+        <div class="plan-revise-form hidden" id="plan-revise-form-${msgId}">
+          <textarea class="plan-revise-input" rows="3" placeholder="Tell the manager what to change — e.g. skip Report authoring, focus on SQL only…"></textarea>
+          <button type="button" class="btn btn-primary btn-sm plan-revise-submit-btn" data-plan-msg="${msgId}">Submit revision</button>
+        </div>`;
     return `
       <div class="plan-proposal-actions" data-plan-msg="${msgId}">
         <p class="plan-proposal-hint">This workflow uses more than half your specialists. Confirm to run it, or suggest changes.</p>
         <div class="plan-proposal-buttons">
           <button type="button" class="btn btn-primary btn-sm plan-confirm-btn" data-plan-msg="${msgId}">Confirm &amp; run</button>
-          <button type="button" class="btn btn-secondary btn-sm plan-revise-toggle-btn" data-plan-msg="${msgId}">Revise plan</button>
+          ${submittedRevision ? "" : `<button type="button" class="btn btn-secondary btn-sm plan-revise-toggle-btn" data-plan-msg="${msgId}">Revise plan</button>`}
           <button type="button" class="btn btn-ghost btn-sm plan-dismiss-btn" data-plan-msg="${msgId}">Dismiss</button>
         </div>
-        <div class="plan-revise-form hidden" id="plan-revise-form-${msgId}">
-          <textarea class="plan-revise-input" rows="3" placeholder="Tell the manager what to change — e.g. skip Report authoring, focus on SQL only…"></textarea>
-          <button type="button" class="btn btn-primary btn-sm plan-revise-submit-btn" data-plan-msg="${msgId}">Submit revision</button>
-        </div>
+        ${revisionSubmittedHtml}
+        ${reviseFormHtml}
       </div>`;
   }
 
@@ -2250,8 +2270,21 @@ const ChatWorkspace = (() => {
     }
   }
 
-  async function revisePlan(comments) {
+  async function revisePlan(comments, msgId) {
     if (!currentThread?.id || !currentThread.pending_plan) return;
+    const key = String(msgId || "latest");
+    planRevisionSubmitted.set(key, comments);
+    const actions = document.querySelector(`.plan-proposal-actions[data-plan-msg="${key}"]`);
+    if (actions) {
+      actions.querySelector(".plan-revise-form")?.remove();
+      actions.querySelector(".plan-revise-toggle-btn")?.remove();
+      if (!actions.querySelector(".plan-revision-submitted")) {
+        const note = document.createElement("p");
+        note.className = "plan-revision-submitted";
+        note.textContent = `Revision submitted: ${comments}`;
+        actions.appendChild(note);
+      }
+    }
     sending = true;
     updateSendState();
     showThinkingPanel({ phase_label: "Revising workflow plan…", agent_name: currentAgent()?.name }, { forceScroll: true });
@@ -2309,7 +2342,7 @@ const ChatWorkspace = (() => {
           alert("Please describe how you'd like the plan changed.");
           return;
         }
-        revisePlan(comments);
+        revisePlan(comments, msgId);
       });
     });
     root?.querySelectorAll(".plan-dismiss-btn").forEach((btn) => {
@@ -2994,6 +3027,13 @@ const ChatWorkspace = (() => {
     return accountBilling()?.formatPlanDate?.(iso) || "—";
   }
 
+  function renderAccountUsageSection(sub, { compact = false } = {}) {
+    return accountBilling()?.renderUsageMeterHtml?.(sub, {
+      compact,
+      periodEnd: sub?.current_period_end || null,
+    }) || "";
+  }
+
   function closeAccountModal() {
     accountModalView = "overview";
     const modal = $("account-modal");
@@ -3028,19 +3068,13 @@ const ChatWorkspace = (() => {
     const hasAccess = Boolean(sub?.access_granted);
 
     const usageHtml = hasAccess ? (() => {
-      const used = Number(sub.token_used_count ?? sub.token_used_usd ?? 0);
-      const budget = Number(sub.token_budget_count ?? sub.token_budget_usd ?? 0);
-      const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
       const cancelNote = sub.cancel_at_period_end
         ? `<p class="account-muted account-cancel-note">Cancels on ${escapeHtml(formatAccountDate(sub.current_period_end))}</p>`
         : "";
       return `
         <section class="account-section account-section-compact">
           <p class="account-muted">Current — ${escapeHtml(billing.getCurrentPlanLabel())}</p>
-          <div class="account-token-bar" aria-hidden="true">
-            <div class="account-token-fill" style="width:${pct}%"></div>
-          </div>
-          <p class="account-value account-value-sm">${escapeHtml(formatAccountTokens(used))} / ${escapeHtml(formatAccountTokens(budget))}</p>
+          ${renderAccountUsageSection(sub, { compact: true })}
           ${cancelNote}
         </section>`;
     })() : "";
@@ -3153,29 +3187,18 @@ const ChatWorkspace = (() => {
 
     let tokenSection = `
       <section class="account-section">
-        <h4>Token usage</h4>
+        <h4>Usage</h4>
         <div class="account-token-bar" aria-hidden="true">
           <div class="account-token-fill" style="width:0%"></div>
         </div>
-        <p class="account-value">— / — tokens</p>
-        <p class="account-muted">Subscribe to a plan to get a monthly API token allowance.</p>
+        <p class="account-muted">Subscribe to a plan to unlock your workspace.</p>
       </section>`;
 
     if (hasAccess) {
-      const used = Number(sub.token_used_count ?? sub.token_used_usd ?? 0);
-      const budget = Number(sub.token_budget_count ?? sub.token_budget_usd ?? 0);
-      const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
-      const periodNote = sub.current_period_end
-        ? `Resets ${formatAccountDate(sub.current_period_end)}`
-        : "";
       tokenSection = `
         <section class="account-section">
-          <h4>Token usage</h4>
-          <div class="account-token-bar" aria-hidden="true">
-            <div class="account-token-fill" style="width:${pct}%"></div>
-          </div>
-          <p class="account-value">${escapeHtml(formatAccountTokens(used))} / ${escapeHtml(formatAccountTokens(budget))}</p>
-          <p class="account-muted">${periodNote || "Monthly allowance — unused tokens do not roll over."}</p>
+          <h4>Usage</h4>
+          ${renderAccountUsageSection(sub)}
         </section>`;
     }
 
@@ -3187,8 +3210,10 @@ const ChatWorkspace = (() => {
           <h4>${hasAccess ? "Upgrade" : "Plan"}</h4>
           <p class="account-value">${escapeHtml(nextPlan.name)} · ${escapeHtml(nextPlan.price_display)}/mo</p>
           <p class="account-muted">${escapeHtml(formatAccountTokenAllowance(nextPlan))} · ${escapeHtml(nextPlan.description)}</p>
-          <button type="button" class="btn btn-primary btn-sm" id="account-buy-next">${escapeHtml(buyLabel)}</button>
-          <button type="button" class="btn btn-secondary btn-sm" id="account-view-plans">View all plans</button>
+          <div class="account-action-row">
+            <button type="button" class="btn btn-primary btn-sm" id="account-buy-next">${escapeHtml(buyLabel)}</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="account-view-plans">View all plans</button>
+          </div>
         </section>`;
     } else if (hasAccess) {
       upgradeSection = `
@@ -3213,12 +3238,13 @@ const ChatWorkspace = (() => {
         <section class="account-section">
           <h4>Sign in</h4>
           <div class="account-login-row">
-            <p class="account-value">${escapeHtml(email || "Not signed in")}</p>
+            <div class="account-login-main">
+              <p class="account-value">${escapeHtml(email || "Not signed in")}</p>
+              ${signedIn ? `<p class="account-current-plan">${escapeHtml(planLabel)}</p>` : ""}
+            </div>
             ${signedIn ? '<span class="account-status-pill">Signed in</span>' : ""}
           </div>
-          ${signedIn ? `<p class="account-current-plan">${escapeHtml(planLabel)}</p>` : ""}
           ${signedIn ? "" : '<button type="button" class="btn btn-primary btn-sm" id="account-modal-signin">Sign in</button>'}
-          <p class="account-muted">Manage your login and session here.</p>
         </section>
         ${tokenSection}
         ${upgradeSection}

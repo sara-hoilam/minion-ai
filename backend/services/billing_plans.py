@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+# 60% of subscription price funds Cursor API usage; 40% is Minion margin.
 TOKEN_ALLOWANCE_RATIO = 0.60
+MARGIN_RATIO = 1.0 - TOKEN_ALLOWANCE_RATIO
 TOKENS_PER_USD = 100_000
 
 
@@ -18,12 +20,23 @@ class Plan:
     stripe_price_env: str
 
     @property
-    def monthly_token_usd(self) -> float:
+    def monthly_billed_usd(self) -> float:
+        """User-facing usage cap (full plan price; includes 40% margin)."""
+        return float(self.price_usd)
+
+    @property
+    def monthly_api_usd(self) -> float:
+        """Max actual Composer API spend before the user hits their cap."""
         return round(self.price_usd * TOKEN_ALLOWANCE_RATIO, 2)
 
     @property
+    def monthly_token_usd(self) -> float:
+        """Billed usage cap stored on user_subscriptions.token_budget_usd."""
+        return self.monthly_billed_usd
+
+    @property
     def monthly_token_count(self) -> int:
-        return int(self.monthly_token_usd * TOKENS_PER_USD)
+        return int(self.monthly_billed_usd * TOKENS_PER_USD)
 
     def stripe_price_id(self) -> str:
         return _stripe_config(self.stripe_price_env)
@@ -35,7 +48,9 @@ class Plan:
             "price_usd": self.price_usd,
             "price_display": f"${self.price_usd}",
             "monthly_token_usd": self.monthly_token_usd,
+            "monthly_api_usd": self.monthly_api_usd,
             "monthly_token_count": self.monthly_token_count,
+            "margin_ratio": MARGIN_RATIO,
             "description": self.description,
             "stripe_configured": bool(self.stripe_price_id()),
         }
@@ -60,14 +75,20 @@ def get_plan(plan_id: str | None) -> Plan | None:
     return PLANS.get(plan_id)
 
 
+def actual_cost_to_billed_usd(actual_usd: float) -> float:
+    """Apply 40% margin: $6 actual API cost → $10 billed to the user."""
+    if actual_usd <= 0:
+        return 0.0
+    return round(actual_usd / TOKEN_ALLOWANCE_RATIO, 6)
+
+
 def upgrade_token_credit_usd(from_plan_id: str, to_plan_id: str) -> float:
-    """Top-up token credit when upgrading mid-cycle: 60% of price difference."""
+    """Mid-cycle upgrade adds the full plan price difference to the billed cap."""
     from_plan = get_plan(from_plan_id)
     to_plan = get_plan(to_plan_id)
     if not from_plan or not to_plan:
         return 0.0
-    diff = max(0, to_plan.price_usd - from_plan.price_usd)
-    return round(diff * TOKEN_ALLOWANCE_RATIO, 2)
+    return float(max(0, to_plan.price_usd - from_plan.price_usd))
 
 
 def _stripe_config(key: str) -> str:

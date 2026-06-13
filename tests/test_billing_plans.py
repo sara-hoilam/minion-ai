@@ -7,6 +7,7 @@ from backend.models import User, UserSubscription, db
 from backend.services.billing_plans import (
     PLANS,
     TOKEN_ALLOWANCE_RATIO,
+    actual_cost_to_billed_usd,
     get_plan,
     upgrade_token_credit_usd,
 )
@@ -18,21 +19,68 @@ from backend.services.subscription_service import (
 )
 
 
+def test_all_plans_apply_billed_budget_and_api_cap():
+    expected = {
+        "starter": (10.0, 6.0, 1_000_000),
+        "growth": (25.0, 15.0, 2_500_000),
+        "professional": (60.0, 36.0, 6_000_000),
+        "business": (150.0, 90.0, 15_000_000),
+    }
+    for plan_id, (billed, api_cap, tokens) in expected.items():
+        plan = get_plan(plan_id)
+        assert plan.monthly_billed_usd == billed
+        assert plan.monthly_api_usd == api_cap
+        assert plan.monthly_token_count == tokens
+
+
+def test_activate_subscription_sets_billed_budget_for_each_plan():
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "DISABLE_AUTH": False,
+    })
+    with app.app_context():
+        for plan_id, (billed, _, _) in {
+            "starter": (10.0, 6.0, 1_000_000),
+            "growth": (25.0, 15.0, 2_500_000),
+            "professional": (60.0, 36.0, 6_000_000),
+            "business": (150.0, 90.0, 15_000_000),
+        }.items():
+            user = User(email=f"{plan_id}@test.com")
+            user.set_password("securepass1")
+            db.session.add(user)
+            db.session.commit()
+            activate_subscription(user, plan_id)
+            sub = UserSubscription.query.filter_by(user_id=user.id).first()
+            assert float(sub.token_budget_usd) == billed, plan_id
+            db.session.delete(sub)
+            db.session.delete(user)
+            db.session.commit()
+
+
 def test_plan_monthly_token_allowance():
     assert TOKEN_ALLOWANCE_RATIO == 0.60
-    assert get_plan("starter").monthly_token_usd == 6.0
-    assert get_plan("growth").monthly_token_usd == 15.0
-    assert get_plan("professional").monthly_token_usd == 36.0
-    assert get_plan("business").monthly_token_usd == 90.0
-    assert get_plan("starter").monthly_token_count == 600_000
-    assert get_plan("growth").monthly_token_count == 1_500_000
-    assert get_plan("professional").monthly_token_count == 3_600_000
-    assert get_plan("business").monthly_token_count == 9_000_000
+    starter = get_plan("starter")
+    assert starter.monthly_billed_usd == 10.0
+    assert starter.monthly_api_usd == 6.0
+    assert starter.monthly_token_usd == 10.0
+    assert get_plan("growth").monthly_billed_usd == 25.0
+    assert get_plan("growth").monthly_api_usd == 15.0
+    assert get_plan("professional").monthly_api_usd == 36.0
+    assert get_plan("business").monthly_api_usd == 90.0
+    assert starter.monthly_token_count == 1_000_000
+    assert get_plan("growth").monthly_token_count == 2_500_000
+    assert get_plan("professional").monthly_token_count == 6_000_000
+    assert get_plan("business").monthly_token_count == 15_000_000
 
 
-def test_upgrade_token_credit_is_sixty_percent_of_price_difference():
-    assert upgrade_token_credit_usd("starter", "growth") == 9.0
-    assert upgrade_token_credit_usd("growth", "professional") == 21.0
+def test_actual_cost_to_billed_applies_forty_percent_margin():
+    assert actual_cost_to_billed_usd(6.0) == 10.0
+    assert actual_cost_to_billed_usd(15.0) == 25.0
+
+
+def test_upgrade_token_credit_is_full_price_difference():
+    assert upgrade_token_credit_usd("starter", "growth") == 15.0
+    assert upgrade_token_credit_usd("growth", "professional") == 35.0
     assert upgrade_token_credit_usd("professional", "starter") == 0.0
     assert upgrade_token_credit_usd("unknown", "growth") == 0.0
 
@@ -54,7 +102,7 @@ def test_subscription_access_granted_active_within_period():
             user_id=user.id,
             plan_id="starter",
             status="active",
-            token_budget_usd=6.0,
+            token_budget_usd=10.0,
             token_used_usd=1.0,
             current_period_start=now,
             current_period_end=now + timedelta(days=30),
@@ -111,7 +159,7 @@ def test_apply_plan_upgrade_adds_token_credit_not_full_reset():
         apply_plan_upgrade(user, "growth")
         sub = UserSubscription.query.filter_by(user_id=user.id).first()
         assert sub.plan_id == "growth"
-        assert float(sub.token_budget_usd) == 15.0  # 6 starter + 9 upgrade credit
+        assert float(sub.token_budget_usd) == 25.0  # 10 starter + 15 upgrade credit
         assert float(sub.token_used_usd) == 2.0
 
 
@@ -133,7 +181,7 @@ def test_subscription_access_denied_without_stripe_subscription_when_stripe_enab
             user_id=user.id,
             plan_id="professional",
             status="active",
-            token_budget_usd=36.0,
+            token_budget_usd=60.0,
             token_used_usd=0,
             current_period_start=now,
             current_period_end=now + timedelta(days=30),
@@ -197,4 +245,4 @@ def test_billing_config_lists_all_plans():
     plan_ids = [p["id"] for p in data["plans"]]
     assert plan_ids == list(PLANS.keys())
     assert data["tokens_per_usd"] == 100_000
-    assert data["plans"][0]["monthly_token_count"] == 600_000
+    assert data["plans"][0]["monthly_token_count"] == 1_000_000

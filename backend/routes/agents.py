@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
@@ -120,7 +120,7 @@ def framework_preview_job_start():
     def build(reporter):
         return generate_framework_preview(jd, context, reporter=reporter)
 
-    job_id = start_job(current_user.id, build)
+    job_id = start_job(current_user.id, build, current_app._get_current_object())
     return jsonify({"job_id": job_id, "accepted": True}), 202
 
 
@@ -275,6 +275,18 @@ def get_prebuilt_catalog():
     return jsonify({"agents": agents})
 
 
+def _prebuilt_job_description(template: dict, context: dict) -> dict:
+    """Deterministic JD for curated templates — no LLM call required."""
+    skills = user_skills_list(context.get("skillset") or "")[:MAX_AGENT_SKILLS]
+    return {
+        "title": template.get("job_title") or context.get("current_job") or "Specialist",
+        "summary": (template.get("description") or template.get("tagline") or "").strip(),
+        "responsibilities": [
+            f"Apply {skill} to deliverables aligned with this role." for skill in skills[:4]
+        ] or ["Handle user requests within assigned skills."],
+    }
+
+
 @agents_bp.route("/prebuilt/<template_id>/add", methods=["POST"])
 @login_required
 def add_prebuilt_agent(template_id: str):
@@ -307,16 +319,12 @@ def add_prebuilt_agent(template_id: str):
         })
 
     context = enrich_agent_context(build_agent_context(template))
-    jd_result = generate_jd_draft(context)
-    jd = jd_result.get("job_description")
-    if not jd or not jd.get("responsibilities"):
-        return jsonify({"error": "Could not generate job description for template"}), 500
-
+    jd = _prebuilt_job_description(template, context)
     context["job_description"] = jd
-    fw_result = generate_framework_preview(jd, context)
-    framework = fw_result.get("framework")
-    if not framework:
-        return jsonify({"error": "Could not generate framework for template"}), 500
+    built = build_skill_framework(jd, context, from_user_skills_only=True)
+    framework = built.get("framework") or built
+    if not framework or not framework.get("agents"):
+        return jsonify({"error": "Could not build framework for template"}), 500
 
     context["framework_design"] = {
         "framework": framework,

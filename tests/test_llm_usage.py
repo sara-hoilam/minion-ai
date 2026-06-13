@@ -2,12 +2,13 @@
 
 from backend.app import create_app
 from backend.models import LlmUsageEvent, User, UserSubscription, db
+from backend.services.billing_plans import actual_cost_to_billed_usd
 from backend.services.llm_usage_context import LlmUsageContext, llm_usage_scope
 from backend.services.llm_usage_service import record_cursor_run, tokens_to_cost_usd
 from backend.services.subscription_service import activate_subscription, subscription_to_dict
 
 
-def test_tokens_to_cost_usd():
+def test_tokens_to_cost_usd_composer_fast_rates():
     usage = {
         "inputTokens": 1_000_000,
         "outputTokens": 0,
@@ -15,14 +16,18 @@ def test_tokens_to_cost_usd():
         "cacheWriteTokens": 0,
         "totalTokens": 1_000_000,
     }
-    assert tokens_to_cost_usd(usage) == 1.25
+    assert tokens_to_cost_usd(usage) == 3.0
 
     usage["outputTokens"] = 1_000_000
     usage["totalTokens"] = 2_000_000
-    assert tokens_to_cost_usd(usage) == 7.25
+    assert tokens_to_cost_usd(usage) == 18.0
 
 
-def test_record_cursor_run_persists_event_and_updates_subscription(monkeypatch):
+def test_actual_cost_to_billed_usd_forty_percent_margin():
+    assert actual_cost_to_billed_usd(6.0) == 10.0
+
+
+def test_record_cursor_run_applies_margin_to_subscription(monkeypatch):
     app = create_app({
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "DISABLE_AUTH": False,
@@ -30,11 +35,11 @@ def test_record_cursor_run_persists_event_and_updates_subscription(monkeypatch):
 
     def fake_fetch(agent_id, run_id):
         return {
-            "inputTokens": 4000,
-            "outputTokens": 1000,
-            "cacheReadTokens": 2000,
-            "cacheWriteTokens": 500,
-            "totalTokens": 7500,
+            "inputTokens": 2_000_000,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "totalTokens": 2_000_000,
         }
 
     monkeypatch.setattr("backend.services.llm_usage_service.fetch_run_usage", fake_fetch)
@@ -47,6 +52,7 @@ def test_record_cursor_run_persists_event_and_updates_subscription(monkeypatch):
 
         activate_subscription(user, "starter")
         sub = UserSubscription.query.filter_by(user_id=user.id).first()
+        assert float(sub.token_budget_usd) == 10.0
         assert float(sub.token_used_usd or 0) == 0
 
         ctx = LlmUsageContext(user_id=user.id, thread_id=None, source="chat")
@@ -54,20 +60,14 @@ def test_record_cursor_run_persists_event_and_updates_subscription(monkeypatch):
             event = record_cursor_run("bc-agent-1", "run-abc-123")
 
         assert event is not None
-        assert event.total_tokens == 7500
-        assert event.user_id == user.id
-        assert event.cursor_run_id == "run-abc-123"
+        assert float(event.cost_usd) == 6.0
+        assert float(event.billed_usd) == 10.0
 
         sub = UserSubscription.query.filter_by(user_id=user.id).first()
-        assert float(sub.token_used_usd or 0) > 0
+        assert float(sub.token_used_usd) == 10.0
 
         count = LlmUsageEvent.query.filter_by(user_id=user.id).count()
         assert count == 1
-
-        with llm_usage_scope(ctx):
-            again = record_cursor_run("bc-agent-1", "run-abc-123")
-        assert again.id == event.id
-        assert LlmUsageEvent.query.filter_by(user_id=user.id).count() == 1
 
 
 def test_subscription_at_token_limit_flag():

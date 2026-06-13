@@ -106,13 +106,14 @@ def subscription_to_dict(sub: UserSubscription | None, user: User) -> dict:
         "token_usage_percent": (
             min(
                 100,
-                int(
+                round(
                     100
                     * float(sub.token_used_usd or 0)
-                    / float(sub.token_budget_usd or 1)
+                    / float(plan.price_usd or 1),
+                    1,
                 ),
             )
-            if sub and float(sub.token_budget_usd or 0) > 0
+            if sub and plan and plan.price_usd > 0
             else 0
         ),
         "current_period_start": sub.current_period_start.isoformat() if sub and sub.current_period_start else None,

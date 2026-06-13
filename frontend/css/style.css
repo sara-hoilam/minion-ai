@@ -5186,10 +5186,11 @@ body.home-workspace .collab-shell {
 
 .thought-block-body {
   margin: 0;
-  font-family: Georgia, "Times New Roman", Times, serif;
-  font-size: 0.92rem;
-  line-height: 1.55;
-  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted);
+  font-weight: 400;
 }
 
 .thought-block-empty {
@@ -5509,14 +5510,21 @@ body.home-workspace .collab-shell {
   resize: vertical;
 }
 
+.plan-revision-submitted {
+  margin: 0.65rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
 .account-panel {
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
+  gap: 0.75rem;
 }
 
 .account-section {
-  padding-bottom: 1rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -5526,62 +5534,118 @@ body.home-workspace .collab-shell {
 }
 
 .account-section h4 {
-  margin: 0 0 0.45rem;
-  font-size: 0.72rem;
+  margin: 0 0 0.35rem;
+  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--muted);
 }
 
 .account-value {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.84rem;
   font-weight: 600;
   color: var(--text);
+  line-height: 1.35;
 }
 
 .account-muted {
-  margin: 0.35rem 0 0;
-  font-size: 0.82rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.74rem;
   color: var(--muted);
-  line-height: 1.45;
+  line-height: 1.4;
+}
+
+.account-usage-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.account-usage-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.account-usage-percent {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.account-usage-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.account-usage-detail {
+  margin-top: 0.1rem;
+}
+
+.account-usage-meter-compact .account-usage-percent {
+  font-size: 1.05rem;
+}
+
+.account-usage-meter-compact .account-usage-label {
+  font-size: 0.68rem;
 }
 
 .account-token-bar {
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
   background: var(--surface-2, #ece8e1);
   overflow: hidden;
-  margin: 0.5rem 0 0.35rem;
+  margin: 0.15rem 0 0;
 }
 
 .account-token-fill {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent-start), var(--accent-end));
-  opacity: 0.45;
+  opacity: 0.55;
+  transition: width 0.25s ease;
 }
 
 .account-section .btn {
-  margin-top: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.account-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.account-action-row .btn {
+  margin-top: 0;
 }
 
 .account-login-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.65rem;
+}
+
+.account-login-main {
+  min-width: 0;
 }
 
 .account-status-pill {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  padding: 0.2rem 0.55rem;
+  padding: 0.15rem 0.45rem;
   border-radius: 999px;
   background: #ecfdf5;
   color: #047857;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .account-modal-wide {
@@ -5637,13 +5701,13 @@ body.home-workspace .collab-shell {
 }
 
 .account-current-plan {
-  margin: 0.2rem 0 0;
-  font-size: 0.82rem;
+  margin: 0.1rem 0 0;
+  font-size: 0.72rem;
   color: var(--muted);
 }
 
 .account-value-sm {
-  font-size: 0.88rem;
+  font-size: 0.78rem;
 }
 
 .account-cancel-note {
@@ -5661,10 +5725,26 @@ body.home-workspace .collab-shell {
 }
 
 .account-modal-footer .btn {
-  min-width: 5.25rem;
-  padding: 0.4rem 0.85rem;
-  font-size: 0.82rem;
+  min-width: 4.75rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.76rem;
   line-height: 1.2;
+}
+
+#account-modal .modal-header {
+  padding: 0.7rem 0.9rem;
+}
+
+#account-modal .modal-header h3 {
+  font-size: 0.88rem;
+}
+
+#account-modal .modal-dialog-sm .modal-body {
+  padding: 0.7rem 0.9rem 0.85rem;
+}
+
+#account-modal .account-modal-footer {
+  padding: 0 0.9rem 0.85rem;
 }
 
 .auth-name-row {
@@ -6790,6 +6870,12 @@ body.landing-active .site-header {
 
 .plans-usage-stat strong {
   font-size: 1.1rem;
+}
+
+.plans-usage-detail {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .plans-usage-bar {

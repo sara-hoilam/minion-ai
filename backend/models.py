@@ -304,6 +304,7 @@ class LlmUsageEvent(db.Model):
     cache_write_tokens = db.Column(db.Integer, nullable=False, default=0)
     total_tokens = db.Column(db.Integer, nullable=False, default=0)
     cost_usd = db.Column(db.Numeric(12, 6), nullable=False, default=0)
+    billed_usd = db.Column(db.Numeric(12, 6), nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=utcnow)
 
     user = db.relationship("User", backref=db.backref("llm_usage_events", lazy="dynamic"))
