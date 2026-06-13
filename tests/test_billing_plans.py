@@ -41,6 +41,7 @@ def test_subscription_access_granted_active_within_period():
     app = create_app({
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "DISABLE_AUTH": False,
+        "STRIPE_SECRET_KEY": "",
     })
     with app.app_context():
         user = User(email="sub@test.com")
@@ -112,6 +113,36 @@ def test_apply_plan_upgrade_adds_token_credit_not_full_reset():
         assert sub.plan_id == "growth"
         assert float(sub.token_budget_usd) == 15.0  # 6 starter + 9 upgrade credit
         assert float(sub.token_used_usd) == 2.0
+
+
+def test_subscription_access_denied_without_stripe_subscription_when_stripe_enabled():
+    app = create_app({
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "DISABLE_AUTH": False,
+        "STRIPE_SECRET_KEY": "sk_test_fake",
+        "STRIPE_PRICE_STARTER": "price_test_starter",
+    })
+    with app.app_context():
+        user = User(email="stripeonly@test.com")
+        user.set_password("securepass1")
+        db.session.add(user)
+        db.session.commit()
+
+        now = datetime.now(timezone.utc)
+        sub = UserSubscription(
+            user_id=user.id,
+            plan_id="professional",
+            status="active",
+            token_budget_usd=36.0,
+            token_used_usd=0,
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        db.session.add(sub)
+        db.session.commit()
+
+        assert subscription_access_granted(sub) is False
+        assert subscription_to_dict(sub, user)["access_granted"] is False
 
 
 def test_post_message_returns_402_without_subscription():

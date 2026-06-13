@@ -2846,6 +2846,7 @@ const ChatWorkspace = (() => {
           refreshPlansPage: false,
           onUpdated: async () => {
             await billing.load();
+            if (!billing.getSubscription()?.access_granted) return;
             updateUserFooter();
             openAccountModal();
           },
@@ -2887,7 +2888,7 @@ const ChatWorkspace = (() => {
     const billing = accountBilling();
     const sub = billing?.getSubscription?.();
     const hasAccess = Boolean(sub?.access_granted);
-    const planLabel = billing?.getCurrentPlanLabel?.() || "No plan";
+    const planLabel = billing?.getCurrentPlanLabel?.() || "Free Plan";
     const nextPlan = billing?.getNextPlanTier?.();
 
     let tokenSection = `
@@ -2990,6 +2991,7 @@ const ChatWorkspace = (() => {
           refreshPlansPage: false,
           onUpdated: async () => {
             await billing.load();
+            if (!billing.getSubscription()?.access_granted) return;
             updateUserFooter();
             openAccountModal();
           },
@@ -3043,7 +3045,7 @@ const ChatWorkspace = (() => {
   function updateUserFooter() {
     const displayName = accountDisplayName();
     const initial = accountInitial();
-    const planLabel = window.Billing?.getCurrentPlanLabel?.() || "No plan";
+    const planLabel = window.Billing?.getCurrentPlanLabel?.() || "Free Plan";
     if ($("collab-user-name")) $("collab-user-name").textContent = displayName;
     if ($("collab-user-avatar")) $("collab-user-avatar").textContent = initial;
     if ($("collab-rail-account-avatar")) $("collab-rail-account-avatar").textContent = initial;

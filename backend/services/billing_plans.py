@@ -26,7 +26,7 @@ class Plan:
         return int(self.monthly_token_usd * TOKENS_PER_USD)
 
     def stripe_price_id(self) -> str:
-        return (os.getenv(self.stripe_price_env) or "").strip()
+        return _stripe_config(self.stripe_price_env)
 
     def to_dict(self) -> dict:
         return {
@@ -70,7 +70,20 @@ def upgrade_token_credit_usd(from_plan_id: str, to_plan_id: str) -> float:
     return round(diff * TOKEN_ALLOWANCE_RATIO, 2)
 
 
+def _stripe_config(key: str) -> str:
+    try:
+        from flask import has_app_context, current_app
+
+        if has_app_context():
+            val = current_app.config.get(key)
+            if val is not None and str(val).strip():
+                return str(val).strip()
+    except RuntimeError:
+        pass
+    return (os.getenv(key) or "").strip()
+
+
 def stripe_enabled() -> bool:
-    return bool(os.getenv("STRIPE_SECRET_KEY", "").strip()) and any(
-        p.stripe_price_id() for p in PLANS.values()
-    )
+    if not _stripe_config("STRIPE_SECRET_KEY"):
+        return False
+    return any(_stripe_config(p.stripe_price_env) for p in PLANS.values())

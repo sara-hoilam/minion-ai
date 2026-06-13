@@ -1427,9 +1427,11 @@ function planPriceRank(planId) {
   return plans.findIndex((p) => p.id === planId);
 }
 
+const FREE_PLAN_LABEL = "Free Plan";
+
 function getCurrentPlanLabel() {
   const sub = billingSubscription;
-  if (!sub?.access_granted) return "No plan";
+  if (!sub?.access_granted) return FREE_PLAN_LABEL;
   return sub.plan_name || sub.plan_id || "Active";
 }
 
@@ -1574,6 +1576,9 @@ async function checkoutPlan(planId, options = {}) {
       return res;
     }
     billingSubscription = res.subscription || await api("/billing/subscription");
+    if (!billingSubscription?.access_granted) {
+      return res;
+    }
     if (msgEl) {
       msgEl.innerHTML = `<div class="alert alert-success">${escapeHtml(res.message || "Plan updated.")}</div>`;
     }
@@ -1777,6 +1782,7 @@ async function bootstrap() {
     formatPlanTokenAllowance,
     formatPlanDate,
     getCurrentPlanLabel,
+    getFreePlanLabel: () => FREE_PLAN_LABEL,
     getNextPlanTier,
     planPriceRank,
     planActionLabel,

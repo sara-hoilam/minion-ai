@@ -11,6 +11,7 @@ from backend.services.billing_plans import (
     TOKEN_ALLOWANCE_RATIO,
     TOKENS_PER_USD,
     get_plan,
+    stripe_enabled,
     upgrade_token_credit_usd,
 )
 
@@ -72,6 +73,8 @@ def subscription_access_granted(sub: UserSubscription | None) -> bool:
     if current_app.config.get("DISABLE_AUTH"):
         return True
     if not sub or sub.status not in ACTIVE_STATUSES:
+        return False
+    if stripe_enabled() and not sub.stripe_subscription_id:
         return False
     end = _as_aware(sub.current_period_end)
     if end and _now() > end and not sub.cancel_at_period_end:
@@ -198,6 +201,26 @@ def mark_cancel_at_period_end(user: User) -> UserSubscription:
     sub.updated_at = _now()
     db.session.commit()
     log_event(user.id, "cancel_scheduled", plan_id=sub.plan_id)
+    return sub
+
+
+def reset_subscription_to_free(user: User) -> UserSubscription:
+    """Clear paid plan state — used when revoking dev-mode or manual activations."""
+    sub = get_or_create_subscription(user)
+    sub.plan_id = "starter"
+    sub.status = "inactive"
+    sub.stripe_subscription_id = None
+    sub.stripe_price_id = None
+    sub.token_budget_usd = 0
+    sub.token_used_usd = 0
+    sub.current_period_start = None
+    sub.current_period_end = None
+    sub.cancel_at_period_end = False
+    sub.cancelled_at = None
+    sub.updated_at = _now()
+    user.subscription_status = "inactive"
+    db.session.commit()
+    log_event(user.id, "subscription_reset_free")
     return sub
 
 
