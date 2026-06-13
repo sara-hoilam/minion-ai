@@ -1203,7 +1203,10 @@ async function loadHome() {
         ? '<span class="persona-badge">Framework ready</span>'
         : '<span class="persona-badge">In training</span>';
 
+    const PLATFORM_SKILL_KEYS = new Set(["first principles thinking", "current data awareness"]);
     const skillsHtml = (persona.skills || [])
+      .filter((s) => !PLATFORM_SKILL_KEYS.has(String(s).trim().toLowerCase()))
+      .slice(0, 8)
       .map((s) => `<span class="skill-tag">${escapeHtml(s)}</span>`)
       .join("");
 

@@ -67,4 +67,28 @@ agent_outputs/        generated .md and .json per user (gitignored)
 
 ## Stripe
 
-Set `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and `STRIPE_PRICE_ID` in `.env`. Without them, subscribe activates in dev mode.
+Live products are configured in Stripe Dashboard. The app uses **Price IDs** (`price_...`) for Checkout — not Product IDs (`prod_...`).
+
+Set these in Render (or `.env` locally):
+
+| Variable | Required | Notes |
+|----------|----------|--------|
+| `STRIPE_SECRET_KEY` | Yes (live) | `sk_live_...` — **never commit**; set in Render only |
+| `STRIPE_PUBLISHABLE_KEY` | Yes | `pk_live_...` |
+| `STRIPE_WEBHOOK_SECRET` | Yes (live) | `whsec_...` from webhook endpoint |
+| `STRIPE_PRICE_STARTER` | Yes | `price_1ThY9w377xE4C0OxJPby2yLm` ($10/mo) |
+| `STRIPE_PRICE_GROWTH` | Yes | `price_1ThYB0377xE4C0OxvXVHgURT` ($25/mo) |
+| `STRIPE_PRICE_PROFESSIONAL` | Yes | `price_1ThYCX377xE4C0Oxxt8xpB26` ($60/mo, Stripe product "Pro") |
+| `STRIPE_PRICE_BUSINESS` | Yes | `price_1ThjC9377xE4C0Ox7EbgD06I` ($150/mo) |
+
+Without Stripe keys, subscribe activates in **dev mode** (no real charge).
+
+### Webhook (production)
+
+In Stripe Dashboard → Developers → Webhooks, add:
+
+- **URL:** `https://YOUR_DOMAIN/api/billing/webhook`
+- **Events:** `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`
+- Copy the signing secret to `STRIPE_WEBHOOK_SECRET` in Render.
+
+Plans are chosen in-app via Account → Choose a plan (Stripe Checkout). The Stripe Pricing Table embed (`prctbl_...`) is optional and not used by the app UI.

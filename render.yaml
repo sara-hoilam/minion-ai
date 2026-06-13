@@ -8,3 +8,17 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.8"
+      - key: STRIPE_PUBLISHABLE_KEY
+        value: pk_live_51T2t7D377xE4C0OxqN7QJQBkCwwwFHltcCTuBUASVXLHT5daBL1FWRvoTeCTxhG2QNDlU2EYutuTAWgPACkJ7cZn00iOJ36vWS
+      - key: STRIPE_PRICE_STARTER
+        value: price_1ThY9w377xE4C0OxJPby2yLm
+      - key: STRIPE_PRICE_GROWTH
+        value: price_1ThYB0377xE4C0OxvXVHgURT
+      - key: STRIPE_PRICE_PROFESSIONAL
+        value: price_1ThYCX377xE4C0Oxxt8xpB26
+      - key: STRIPE_PRICE_BUSINESS
+        value: price_1ThjC9377xE4C0Ox7EbgD06I
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

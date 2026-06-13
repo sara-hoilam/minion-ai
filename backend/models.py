@@ -284,3 +284,26 @@ class BillingEvent(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow)
 
     user = db.relationship("User", backref=db.backref("billing_events", lazy="dynamic"))
+
+
+class LlmUsageEvent(db.Model):
+    __tablename__ = "llm_usage_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey("chat_threads.id"), index=True)
+    session_id = db.Column(db.Integer, db.ForeignKey("studio_sessions.id"), index=True)
+    cursor_agent_id = db.Column(db.String(64), nullable=False)
+    cursor_run_id = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    model = db.Column(db.String(80))
+    source = db.Column(db.String(80), nullable=False, default="chat")
+    run_status = db.Column(db.String(32))
+    input_tokens = db.Column(db.Integer, nullable=False, default=0)
+    output_tokens = db.Column(db.Integer, nullable=False, default=0)
+    cache_read_tokens = db.Column(db.Integer, nullable=False, default=0)
+    cache_write_tokens = db.Column(db.Integer, nullable=False, default=0)
+    total_tokens = db.Column(db.Integer, nullable=False, default=0)
+    cost_usd = db.Column(db.Numeric(12, 6), nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=utcnow)
+
+    user = db.relationship("User", backref=db.backref("llm_usage_events", lazy="dynamic"))

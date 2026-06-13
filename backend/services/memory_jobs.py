@@ -34,13 +34,21 @@ def schedule_thread_compaction(
         try:
             with app.app_context():
                 from backend.services.conversation_memory import maybe_compact_thread
+                from backend.services.llm_usage_context import LlmUsageContext, llm_usage_scope
 
-                maybe_compact_thread(
-                    thread_id,
-                    user_id,
-                    agent_name,
-                    agent_session_id=agent_session_id,
+                usage_ctx = LlmUsageContext(
+                    user_id=user_id,
+                    thread_id=thread_id,
+                    session_id=agent_session_id,
+                    source="memory",
                 )
+                with llm_usage_scope(usage_ctx):
+                    maybe_compact_thread(
+                        thread_id,
+                        user_id,
+                        agent_name,
+                        agent_session_id=agent_session_id,
+                    )
         except Exception:
             logger.exception("Background memory compaction failed for thread %s", thread_id)
         finally:

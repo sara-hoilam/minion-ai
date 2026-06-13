@@ -415,7 +415,7 @@ class ChatProgressReporter:
         }]
         for i, st in enumerate(subtasks):
             skill = st.get("skill") or "Specialist"
-            task = (st.get("task") or skill)[:200]
+            task = (st.get("task") or skill)[:500]
             steps.append({
                 "id": f"delegate-{i}",
                 "type": "delegate",
@@ -493,11 +493,11 @@ class ChatProgressReporter:
         if delegate_idx < len(steps):
             skill = subtask.get("skill") or steps[delegate_idx].get("skill")
             steps[delegate_idx]["status"] = "active"
-            steps[delegate_idx]["detail"] = (subtask.get("task") or steps[delegate_idx].get("detail", ""))[:200]
+            steps[delegate_idx]["detail"] = (subtask.get("task") or steps[delegate_idx].get("detail", ""))[:500]
             data["steps"] = steps
             data["phase"] = "delegating"
             data["phase_label"] = f"{skill} specialist is working…"
-            task_note = (subtask.get("task") or steps[delegate_idx].get("detail", ""))[:200]
+            task_note = (subtask.get("task") or steps[delegate_idx].get("detail", ""))[:500]
             self._begin_subagent_thoughts(skill, task_note)
             data = self.snapshot()
             data["steps"] = steps

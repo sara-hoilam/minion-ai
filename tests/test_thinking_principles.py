@@ -6,31 +6,39 @@ from backend.services.thinking_principles import (
     CURRENT_DATA_SKILL,
     FIRST_PRINCIPLES_SKILL,
     enrich_agent_context,
-    ensure_first_principles_in_skillset,
+    is_platform_skill,
+    strip_platform_instruction_blocks,
+    user_skillset,
+    user_skills_list,
     today_label,
 )
 
 
-def test_ensure_first_principles_in_skillset():
-    assert FIRST_PRINCIPLES_SKILL in ensure_first_principles_in_skillset("SQL, Python")
-    again = ensure_first_principles_in_skillset(
-        ensure_first_principles_in_skillset("SQL, Python"),
-    )
-    assert again.count(FIRST_PRINCIPLES_SKILL) == 1
+def test_user_skills_list_excludes_platform_skills():
+    raw = f"{FIRST_PRINCIPLES_SKILL}, SQL, {CURRENT_DATA_SKILL}, Tableau"
+    skills = user_skills_list(raw)
+    assert skills == ["SQL", "Tableau"]
+    assert not any(is_platform_skill(s) for s in skills)
 
 
-def test_enrich_agent_context_sets_skill_and_instructions():
+def test_user_skillset_caps_at_eight():
+    raw = ", ".join(f"Skill {i}" for i in range(12))
+    assert len(user_skillset(raw).split(", ")) == 8
+
+
+def test_enrich_agent_context_keeps_user_skills_only():
     ctx = enrich_agent_context({
         "full_name": "Aria",
-        "skillset": "SQL, Tableau",
+        "skillset": f"{FIRST_PRINCIPLES_SKILL}, SQL, Tableau, {CURRENT_DATA_SKILL}",
+        "working_instructions": "Be concise.",
     })
-    assert FIRST_PRINCIPLES_SKILL in ctx["skillset"]
-    assert CURRENT_DATA_SKILL in ctx["skillset"]
-    assert "first principles" in ctx["working_instructions"].lower()
-    assert "latest available data" in ctx["working_instructions"].lower()
+    assert FIRST_PRINCIPLES_SKILL not in ctx["skillset"]
+    assert CURRENT_DATA_SKILL not in ctx["skillset"]
+    assert ctx["skillset"] == "SQL, Tableau"
+    assert ctx["working_instructions"] == "Be concise."
 
 
-def test_instruction_block_includes_first_principles_for_legacy_agents():
+def test_instruction_block_includes_platform_defaults_in_prompt():
     block = build_agent_instruction_block({
         "full_name": "Sara",
         "current_job": "Analyst",
@@ -41,37 +49,39 @@ def test_instruction_block_includes_first_principles_for_legacy_agents():
     assert "temporal context" in block.lower()
     assert today_label() in block
     assert "latest available data" in block.lower()
+    assert "Core skillset: SQL." in block
 
 
-def test_instruction_block_skips_duplicate_first_principles():
-    custom = "Always apply first principles thinking to forecasts."
+def test_instruction_block_omits_platform_skills_from_skillset_line():
     block = build_agent_instruction_block({
         "full_name": "Sara",
-        "working_instructions": custom,
+        "skillset": f"{FIRST_PRINCIPLES_SKILL}, SQL",
     })
-    assert block.count("Core reasoning approach") == 0
-    assert custom in block
-    assert today_label() in block
+    assert FIRST_PRINCIPLES_SKILL not in block.split("Core skillset:")[1].split(".")[0]
 
 
-def test_instruction_block_skips_duplicate_data_freshness():
-    custom = "Use the latest available data for every benchmark."
-    block = build_agent_instruction_block({
-        "full_name": "Sara",
-        "working_instructions": custom,
-    })
-    assert block.count("Data currency") == 0
-    assert custom in block
-    assert today_label() in block
+def test_strip_platform_instruction_blocks():
+    from backend.services.thinking_principles import (
+        DATA_FRESHNESS_INSTRUCTIONS,
+        FIRST_PRINCIPLES_INSTRUCTIONS,
+    )
+
+    merged = f"{FIRST_PRINCIPLES_INSTRUCTIONS}\n\n{DATA_FRESHNESS_INSTRUCTIONS}\n\nCustom note."
+    assert strip_platform_instruction_blocks(merged) == "Custom note."
 
 
-def test_create_agent_includes_first_principles_skill():
+def test_create_agent_stores_user_skills_only():
     app = create_app({
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "DISABLE_AUTH": False,
     })
     client = app.test_client()
-    client.post("/api/auth/register", json={"email": "fp@test.com", "password": "securepass1", "first_name": "Test", "last_name": "User"})
+    client.post("/api/auth/register", json={
+        "email": "fp@test.com",
+        "password": "securepass1",
+        "first_name": "Test",
+        "last_name": "User",
+    })
     client.post("/api/profile/background", json={
         "full_name": "Owner",
         "field": "Finance",
@@ -109,7 +119,7 @@ def test_create_agent_includes_first_principles_skill():
     }).get_json()["session_id"]
 
     agent = client.get(f"/api/agents/{session_id}").get_json()
-    assert FIRST_PRINCIPLES_SKILL in agent["skillset"]
-    assert CURRENT_DATA_SKILL in agent["skillset"]
-    assert "first principles" in (agent.get("working_instructions") or "").lower()
-    assert "latest available data" in (agent.get("working_instructions") or "").lower()
+    assert FIRST_PRINCIPLES_SKILL not in agent["skillset"]
+    assert CURRENT_DATA_SKILL not in agent["skillset"]
+    assert "FP&A" in agent["skillset"]
+    assert "first principles" not in (agent.get("working_instructions") or "").lower()

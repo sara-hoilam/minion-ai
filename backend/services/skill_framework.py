@@ -7,6 +7,7 @@ import re
 from backend.services.thinking_principles import (
     DATA_FRESHNESS_INSTRUCTIONS,
     FIRST_PRINCIPLES_INSTRUCTIONS,
+    user_skillset,
 )
 
 MANAGER_ID = "manager"
@@ -53,8 +54,8 @@ def skills_list(skillset: str) -> list[str]:
 
 
 def normalize_skillset(skillset: str | None, max_skills: int = MAX_AGENT_SKILLS) -> str:
-    """Return a comma-separated skillset capped at max_skills."""
-    return ", ".join(skills_list(skillset or "")[:max_skills])
+    """Return user skillset capped at max_skills (platform skills excluded)."""
+    return user_skillset(skillset, max_skills)
 
 
 def skill_slug(skill: str) -> str:

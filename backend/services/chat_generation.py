@@ -41,6 +41,7 @@ from backend.services.memory_jobs import schedule_thread_compaction
 from backend.services.cursor_llm import cancel_run as cursor_cancel_run
 
 from backend.services.event_logger import log_event
+from backend.services.llm_usage_context import LlmUsageContext, llm_usage_scope
 
 
 
@@ -264,8 +265,6 @@ def _save_success(
     thread.updated_at = datetime.now(timezone.utc)
 
     db.session.commit()
-
-
 
     log_event("chat_message_sent", {
 
@@ -497,33 +496,40 @@ def _generation_worker(
 
             memory_context = build_memory_context(thread_id, content)
 
-            result = run_agent_turn(
-
-                ctx,
-
-                framework,
-
-                content,
-
-                history=history,
-
-                file_context=combined_context,
-
+            usage_ctx = LlmUsageContext(
                 user_id=user_id,
-
-                agent_session_id=session_id,
-
-                cloud_agent_id=cloud_agent_id,
-
-                progress=reporter,
-
-                approved_plan=approved_plan,
-
-                user_feedback=user_feedback,
-
-                memory_context=memory_context,
-
+                thread_id=thread_id,
+                session_id=session_id,
+                source="chat",
             )
+            with llm_usage_scope(usage_ctx):
+                result = run_agent_turn(
+
+                    ctx,
+
+                    framework,
+
+                    content,
+
+                    history=history,
+
+                    file_context=combined_context,
+
+                    user_id=user_id,
+
+                    agent_session_id=session_id,
+
+                    cloud_agent_id=cloud_agent_id,
+
+                    progress=reporter,
+
+                    approved_plan=approved_plan,
+
+                    user_feedback=user_feedback,
+
+                    memory_context=memory_context,
+
+                )
 
 
 
@@ -557,7 +563,14 @@ def _generation_worker(
 
 
 
-            _save_success(thread_id, user_id, session_id, agent_name, result, generation_seq)
+            _save_success(
+                thread_id,
+                user_id,
+                session_id,
+                agent_name,
+                result,
+                generation_seq,
+            )
 
             schedule_thread_compaction(
 

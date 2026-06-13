@@ -5,6 +5,7 @@
 const BackgroundWizard = (() => {
   const OTHER = "Other";
   const MAX_AGENT_SKILLS = 8;
+  const PLATFORM_SKILL_KEYS = new Set(["first principles thinking", "current data awareness"]);
 
   let catalog = null;
   let mode = "initial";
@@ -87,7 +88,10 @@ const BackgroundWizard = (() => {
   }
 
   function allSkills() {
-    return [...new Set([...state.skills, ...state.custom_skills].map((s) => s.trim()).filter(Boolean))];
+    return [...new Set([...state.skills, ...state.custom_skills]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .filter((s) => !PLATFORM_SKILL_KEYS.has(s.toLowerCase())))];
   }
 
   function skillsetString() {

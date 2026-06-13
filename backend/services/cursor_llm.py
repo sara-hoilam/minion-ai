@@ -65,6 +65,20 @@ def cancel_run(agent_id: str, run_id: str) -> None:
             raise
 
 
+def fetch_agent_run_usage(agent_id: str, run_id: str) -> dict | None:
+    """Return token usage for a single Cursor cloud agent run."""
+    path = f"/v1/agents/{agent_id}/usage?runId={run_id}"
+    data = _request("GET", path, timeout=15)
+    runs = data.get("runs") or []
+    for entry in runs:
+        if entry.get("id") == run_id:
+            return entry.get("usage") or {}
+    if runs:
+        return runs[0].get("usage") or {}
+    totals = data.get("totals") or data.get("total") or {}
+    return totals if totals else None
+
+
 def _poll_run(
     agent_id: str,
     run_id: str,
@@ -98,12 +112,23 @@ def _poll_run(
             on_tick(status, time.time() - started)
         if status in TERMINAL_STATUSES:
             if status == "FINISHED":
-                return (data.get("result") or "").strip() or None
+                result = (data.get("result") or "").strip() or None
+                _record_run_usage(agent_id, run_id, run_status=status)
+                return result
             logger.warning("Cursor run %s ended with status %s", run_id, status)
             return None
         time.sleep(poll_interval)
     logger.warning("Cursor run %s timed out after %ss", run_id, max_wait_s)
     return None
+
+
+def _record_run_usage(agent_id: str, run_id: str, *, run_status: str) -> None:
+    try:
+        from backend.services.llm_usage_service import record_cursor_run
+
+        record_cursor_run(agent_id, run_id, run_status=run_status)
+    except Exception:
+        logger.exception("Failed to record LLM usage for run %s", run_id)
 
 
 def _format_history(history: list[dict]) -> str:

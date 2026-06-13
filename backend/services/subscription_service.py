@@ -97,6 +97,24 @@ def subscription_to_dict(sub: UserSubscription | None, user: User) -> dict:
         "token_budget_count": int(float(sub.token_budget_usd or 0) * TOKENS_PER_USD) if sub else 0,
         "token_used_count": int(float(sub.token_used_usd or 0) * TOKENS_PER_USD) if sub else 0,
         "token_remaining_count": int(sub.token_remaining_usd * TOKENS_PER_USD) if sub else 0,
+        "at_token_limit": (
+            bool(sub)
+            and access
+            and float(sub.token_budget_usd or 0) > 0
+            and sub.token_remaining_usd <= 0
+        ),
+        "token_usage_percent": (
+            min(
+                100,
+                int(
+                    100
+                    * float(sub.token_used_usd or 0)
+                    / float(sub.token_budget_usd or 1)
+                ),
+            )
+            if sub and float(sub.token_budget_usd or 0) > 0
+            else 0
+        ),
         "current_period_start": sub.current_period_start.isoformat() if sub and sub.current_period_start else None,
         "current_period_end": sub.current_period_end.isoformat() if sub and sub.current_period_end else None,
         "cancel_at_period_end": bool(sub.cancel_at_period_end) if sub else False,

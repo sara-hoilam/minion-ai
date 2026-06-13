@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 from backend.services.thinking_principles import (
-    data_freshness_instruction_block,
-    first_principles_instruction_block,
+    DATA_FRESHNESS_INSTRUCTIONS,
+    FIRST_PRINCIPLES_INSTRUCTIONS,
     temporal_context_line,
+    user_skillset,
 )
 
 
 def build_agent_instruction_block(agent_context: dict | None) -> str:
     """
     User-authored agent settings from AI agent configuration.
-    Kept separate from auto-extracted conversation memory.
+    Platform reasoning defaults are appended here — never stored as user skills/instructions.
     """
     ctx = agent_context or {}
     parts: list[str] = [f"Temporal context: {temporal_context_line()}"]
@@ -24,8 +25,9 @@ def build_agent_instruction_block(agent_context: dict | None) -> str:
     else:
         parts.append(f"Agent profile: {name}.")
 
-    if ctx.get("skillset"):
-        parts.append(f"Core skillset: {ctx['skillset']}.")
+    skills = user_skillset(ctx.get("skillset"))
+    if skills:
+        parts.append(f"Core skillset: {skills}.")
 
     jd = ctx.get("job_description") or {}
     if jd.get("title"):
@@ -48,13 +50,8 @@ def build_agent_instruction_block(agent_context: dict | None) -> str:
     if instructions:
         parts.append(f"Standing instructions (always follow):\n{instructions}")
 
-    first_principles = first_principles_instruction_block(ctx)
-    if first_principles:
-        parts.append(f"Core reasoning approach (always follow):\n{first_principles}")
-
-    data_freshness = data_freshness_instruction_block(ctx)
-    if data_freshness:
-        parts.append(f"Data currency (always follow):\n{data_freshness}")
+    parts.append(f"Core reasoning approach (always follow):\n{FIRST_PRINCIPLES_INSTRUCTIONS}")
+    parts.append(f"Data currency (always follow):\n{DATA_FRESHNESS_INSTRUCTIONS}")
 
     if not parts:
         return ""

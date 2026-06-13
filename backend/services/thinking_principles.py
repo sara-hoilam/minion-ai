@@ -1,4 +1,4 @@
-"""Platform-wide defaults applied to every agent."""
+"""Platform-wide defaults applied to every agent (prompt-only — not user-visible skills)."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ DATA_FRESHNESS_INSTRUCTIONS = """Use the latest available data when possible:
 - Flag when information may be outdated and what would be needed to refresh it"""
 
 PLATFORM_SKILLS = (FIRST_PRINCIPLES_SKILL, CURRENT_DATA_SKILL)
+_PLATFORM_SKILL_KEYS = {s.lower() for s in PLATFORM_SKILLS}
 
 
 def today_label() -> str:
@@ -39,69 +40,54 @@ def _parse_skillset(skillset: str | None) -> list[str]:
     return [s.strip() for s in skillset.replace("\n", ",").split(",") if s.strip()]
 
 
+def is_platform_skill(skill: str | None) -> bool:
+    return (skill or "").strip().lower() in _PLATFORM_SKILL_KEYS
+
+
+def user_skills_list(skillset: str | None) -> list[str]:
+    """User-selected skills only (excludes platform defaults)."""
+    return [s for s in _parse_skillset(skillset) if not is_platform_skill(s)]
+
+
+def user_skillset(skillset: str | None, max_skills: int = 8) -> str:
+    """Comma-separated user skills capped at max_skills."""
+    return ", ".join(user_skills_list(skillset)[:max_skills])
+
+
 def ensure_platform_skills_in_skillset(skillset: str | None) -> str:
-    skills = _parse_skillset(skillset)
-    for platform_skill in reversed(PLATFORM_SKILLS):
-        if not any(s.lower() == platform_skill.lower() for s in skills):
-            skills.insert(0, platform_skill)
-    return ", ".join(skills)
+    """Legacy helper — prefer user_skillset for storage; platform skills belong in prompts."""
+    return user_skillset(skillset)
 
 
 def ensure_first_principles_in_skillset(skillset: str | None) -> str:
     return ensure_platform_skills_in_skillset(skillset)
 
 
-def working_instructions_include_first_principles(text: str | None) -> bool:
-    return "first principles" in (text or "").lower()
+def strip_platform_instruction_blocks(text: str | None) -> str:
+    """Remove auto-injected platform instruction blocks from user-visible text."""
+    user = (text or "").strip()
+    for block in (FIRST_PRINCIPLES_INSTRUCTIONS, DATA_FRESHNESS_INSTRUCTIONS):
+        user = user.replace(block, "").strip()
+    while "\n\n\n" in user:
+        user = user.replace("\n\n\n", "\n\n")
+    return user.strip()
 
 
-def working_instructions_include_data_freshness(text: str | None) -> bool:
-    lowered = (text or "").lower()
-    return "latest available data" in lowered or "current data awareness" in lowered
-
-
-def _default_instruction_blocks(user_text: str | None) -> list[str]:
-    user = (user_text or "").strip()
-    blocks: list[str] = []
-    if not working_instructions_include_first_principles(user):
-        blocks.append(FIRST_PRINCIPLES_INSTRUCTIONS)
-    if not working_instructions_include_data_freshness(user):
-        blocks.append(DATA_FRESHNESS_INSTRUCTIONS)
-    return blocks
-
-
-def merge_working_instructions(user_text: str | None) -> str:
-    """Default standing instructions for newly created agents."""
-    user = (user_text or "").strip()
-    defaults = "\n\n".join(_default_instruction_blocks(user))
-    if not defaults:
-        return user
-    if user:
-        return f"{defaults}\n\n{user}"
-    return defaults
+def enrich_agent_context(context: dict) -> dict:
+    """Normalize stored agent context — user skills only, no platform defaults in skillset."""
+    enriched = dict(context)
+    enriched["skillset"] = user_skillset(enriched.get("skillset"))
+    if enriched.get("working_instructions"):
+        cleaned = strip_platform_instruction_blocks(enriched["working_instructions"])
+        enriched["working_instructions"] = cleaned or None
+    return enriched
 
 
 def first_principles_instruction_block(agent_context: dict | None) -> str:
-    """Runtime block for agents that predate the default instructions."""
-    ctx = agent_context or {}
-    if working_instructions_include_first_principles(ctx.get("working_instructions")):
-        return ""
+    """Runtime prompt block (always applied via agent_instructions)."""
     return FIRST_PRINCIPLES_INSTRUCTIONS
 
 
 def data_freshness_instruction_block(agent_context: dict | None) -> str:
-    """Runtime data-currency guidance for agents missing standing instructions."""
-    ctx = agent_context or {}
-    if working_instructions_include_data_freshness(ctx.get("working_instructions")):
-        return ""
+    """Runtime prompt block (always applied via agent_instructions)."""
     return DATA_FRESHNESS_INSTRUCTIONS
-
-
-def enrich_agent_context(context: dict) -> dict:
-    """Apply platform defaults when an agent is created or restored."""
-    enriched = dict(context)
-    enriched["skillset"] = ensure_platform_skills_in_skillset(enriched.get("skillset"))
-    enriched["working_instructions"] = merge_working_instructions(
-        enriched.get("working_instructions"),
-    )
-    return enriched

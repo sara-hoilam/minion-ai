@@ -233,6 +233,27 @@ const ChatWorkspace = (() => {
   let skillsSaveTimer = null;
   let agentDrawerSkills = [];
   const MAX_AGENT_SKILLS = 8;
+  const PLATFORM_SKILL_KEYS = new Set([
+    "first principles thinking",
+    "current data awareness",
+  ]);
+
+  function filterUserSkills(skills) {
+    return (skills || [])
+      .map((s) => String(s).trim())
+      .filter((s) => s && !PLATFORM_SKILL_KEYS.has(s.toLowerCase()))
+      .slice(0, MAX_AGENT_SKILLS);
+  }
+
+  function parseSkillsetString(skillset) {
+    return filterUserSkills(
+      (skillset || "").split(",").map((s) => s.trim()).filter(Boolean),
+    );
+  }
+
+  let agentDetailSkills = [];
+  let agentDetailSkillsSessionId = null;
+  let agentDetailSkillsSaveTimer = null;
 
   async function loadAgentCommunicationStyle() {
     const select = $("collab-agent-communication-style");
@@ -352,16 +373,115 @@ const ChatWorkspace = (() => {
     }
     try {
       const data = await window.api(`/agents/${currentAgentId}`);
-      const skillset = data.skillset || data.agent_context?.skillset || "";
-      agentDrawerSkills = skillset
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, MAX_AGENT_SKILLS);
+      agentDrawerSkills = filterUserSkills(data.skills || parseSkillsetString(data.skillset));
     } catch (_) {
       const persona = personas.find((p) => p.session_id === currentAgentId);
-      agentDrawerSkills = (persona?.skills || []).slice(0, MAX_AGENT_SKILLS);
+      agentDrawerSkills = filterUserSkills(persona?.skills || []);
     }
+  }
+
+  function renderEditableSkillsHtml(skills, { containerId = "", removable = true } = {}) {
+    if (!skills.length) {
+      return '<span class="skill-tag skill-tag-empty">No skills listed</span>';
+    }
+    return skills.map((skill) => `
+      <span class="skill-tag${removable ? " skill-tag-removable" : ""}">
+        ${escapeHtml(skill)}
+        ${removable ? `<button type="button" class="skill-tag-remove" data-skill="${escapeHtml(skill)}" aria-label="Remove ${escapeHtml(skill)}">×</button>` : ""}
+      </span>`).join("");
+  }
+
+  function bindEditableSkills(container, skills, { onChange, statusElId } = {}) {
+    if (!container) return;
+    container.querySelectorAll(".skill-tag-remove").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const name = btn.dataset.skill;
+        const next = skills.filter((s) => s !== name);
+        skills.length = 0;
+        skills.push(...next);
+        container.innerHTML = renderEditableSkillsHtml(skills);
+        bindEditableSkills(container, skills, { onChange, statusElId });
+        onChange?.();
+      });
+    });
+  }
+
+  function scheduleAgentDetailSkillsSave(sessionId) {
+    clearTimeout(agentDetailSkillsSaveTimer);
+    agentDetailSkillsSaveTimer = setTimeout(async () => {
+      const statusEl = $(`agent-detail-skills-status-${sessionId}`);
+      if (!agentDetailSkills.length) {
+        if (statusEl) {
+          statusEl.textContent = "At least one skill is required.";
+          statusEl.classList.remove("hidden");
+        }
+        const data = await window.api(`/agents/${sessionId}`);
+        agentDetailSkills = filterUserSkills(data.skills || parseSkillsetString(data.skillset));
+        renderAgentDetailSkills(sessionId);
+        return;
+      }
+      try {
+        const body = await window.api(`/agents/${sessionId}/skills`, {
+          method: "PUT",
+          body: JSON.stringify({ skills: agentDetailSkills }),
+        });
+        if (window.loadHome) await window.loadHome();
+        personas = window.homePersonas || personas;
+        agentDetailSkills = filterUserSkills(body.skills || agentDetailSkills);
+        renderAgentDetailSkills(sessionId);
+        if (statusEl) {
+          const subs = (body.subagents || []).map((s) => s.skill).filter(Boolean);
+          statusEl.textContent = subs.length
+            ? `Framework updated — ${subs.length} subagent${subs.length === 1 ? "" : "s"}`
+            : "Skills saved";
+          statusEl.classList.remove("hidden");
+          setTimeout(() => statusEl.classList.add("hidden"), 4000);
+        }
+      } catch (err) {
+        if (statusEl) {
+          statusEl.textContent = err.message || "Could not save skills";
+          statusEl.classList.remove("hidden");
+        }
+        const data = await window.api(`/agents/${sessionId}`);
+        agentDetailSkills = filterUserSkills(data.skills || parseSkillsetString(data.skillset));
+        renderAgentDetailSkills(sessionId);
+      }
+    }, 500);
+  }
+
+  function renderAgentDetailSkills(sessionId) {
+    const container = $(`agent-detail-skills-${sessionId}`);
+    if (!container) return;
+    container.innerHTML = renderEditableSkillsHtml(agentDetailSkills);
+    bindEditableSkills(container, agentDetailSkills, {
+      statusElId: `agent-detail-skills-status-${sessionId}`,
+      onChange: () => scheduleAgentDetailSkillsSave(sessionId),
+    });
+    const addBtn = $(`agent-detail-skill-add-btn-${sessionId}`);
+    const input = $(`agent-detail-skill-input-${sessionId}`);
+    if (addBtn) addBtn.disabled = agentDetailSkills.length >= MAX_AGENT_SKILLS;
+    if (input) input.disabled = agentDetailSkills.length >= MAX_AGENT_SKILLS;
+  }
+
+  function addAgentDetailSkill(sessionId) {
+    const input = $(`agent-detail-skill-input-${sessionId}`);
+    const statusEl = $(`agent-detail-skills-status-${sessionId}`);
+    const value = input?.value?.trim();
+    if (!value || PLATFORM_SKILL_KEYS.has(value.toLowerCase())) return;
+    if (agentDetailSkills.length >= MAX_AGENT_SKILLS) {
+      if (statusEl) {
+        statusEl.textContent = `Maximum ${MAX_AGENT_SKILLS} skills per agent.`;
+        statusEl.classList.remove("hidden");
+      }
+      return;
+    }
+    if (!agentDetailSkills.some((s) => s.toLowerCase() === value.toLowerCase())) {
+      agentDetailSkills.push(value);
+    }
+    if (input) input.value = "";
+    if (statusEl) statusEl.classList.add("hidden");
+    renderAgentDetailSkills(sessionId);
+    scheduleAgentDetailSkillsSave(sessionId);
   }
 
   function renderAgentDrawerSkills() {
@@ -430,7 +550,7 @@ const ChatWorkspace = (() => {
     const input = $("collab-agent-skill-input");
     const statusEl = $("collab-agent-skills-status");
     const value = input?.value?.trim();
-    if (!value) return;
+    if (!value || PLATFORM_SKILL_KEYS.has(value.toLowerCase())) return;
     if (agentDrawerSkills.length >= MAX_AGENT_SKILLS) {
       if (statusEl) {
         statusEl.textContent = `Maximum ${MAX_AGENT_SKILLS} skills per agent.`;
@@ -838,6 +958,86 @@ const ChatWorkspace = (() => {
     return (steps || []).filter((st) => includePlan || st.type !== "plan" || st.status === "active");
   }
 
+  function summarizeThoughtLine(text) {
+    const trimmed = (text || "").trim();
+    if (!trimmed) return "";
+    const sentence = trimmed.match(/^[^.!?\n]+[.!?]?/)?.[0]?.trim() || trimmed;
+    if (sentence.length <= 96) return sentence;
+    return `${sentence.slice(0, 93).trim()}…`;
+  }
+
+  function buildThoughtBlocks(source = {}) {
+    const blocks = [];
+    const seen = new Set();
+    const pushBlock = (summary, body) => {
+      const bodyText = (body || summary || "").trim();
+      if (!bodyText || seen.has(bodyText)) return;
+      seen.add(bodyText);
+      blocks.push({
+        summary: (summary || summarizeThoughtLine(bodyText)).trim(),
+        body: bodyText,
+      });
+    };
+
+    const managerPlan = (source.manager_plan || "").trim();
+    if (managerPlan) {
+      pushBlock(summarizeThoughtLine(managerPlan), managerPlan);
+    }
+
+    const hasStepDetails = delegationStepsForDisplay(source.steps || [], { includePlan: true })
+      .some((st) => (st.detail || "").trim());
+
+    (source.thoughts || []).filter(Boolean).forEach((line) => {
+      const text = String(line).trim();
+      if (!text || text === managerPlan) return;
+      if (text.startsWith("── ")) return;
+      if (text === "Delegation decisions:") return;
+      if (hasStepDetails && /^Step \d+ → /.test(text)) return;
+      if (hasStepDetails && text.startsWith("Not delegating to ")) return;
+      pushBlock(summarizeThoughtLine(text), text);
+    });
+
+    delegationStepsForDisplay(source.steps || [], { includePlan: true }).forEach((st) => {
+      const detail = (st.detail || "").trim();
+      const label = (st.label || st.skill || "Step").trim();
+      if (detail) {
+        pushBlock(label, detail);
+      } else if (label) {
+        pushBlock(label, label);
+      }
+    });
+
+    return blocks;
+  }
+
+  function renderThoughtBlocksHtml(blocks) {
+    if (!blocks.length) {
+      return `<p class="thought-block-empty">Thinking…</p>`;
+    }
+    return blocks.map((block) => {
+      const showBody = block.body.length > block.summary.length + 16 && block.body !== block.summary;
+      return `
+        <article class="thought-block">
+          <header class="thought-block-summary">
+            <span>${escapeHtml(block.summary)}</span>
+            <span class="thought-block-chevron" aria-hidden="true">›</span>
+          </header>
+          ${showBody ? `<p class="thought-block-body">${escapeHtml(block.body)}</p>` : ""}
+        </article>`;
+    }).join("");
+  }
+
+  function scrollThoughtBlocksToBottom(root, { force = false } = {}) {
+    const scroller = root?.querySelector?.(".thought-blocks-scroll")
+      || root?.closest?.(".thought-blocks-scroll")
+      || root;
+    if (!scroller) return;
+    const atBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 28;
+    if (force || atBottom) {
+      scroller.scrollTop = scroller.scrollHeight;
+    }
+  }
+
   function renderDelegationStepsHtml(steps, { showActiveDetail = true } = {}) {
     const visible = delegationStepsForDisplay(steps);
     if (!visible.length) return "";
@@ -879,16 +1079,8 @@ const ChatWorkspace = (() => {
   function renderThinkingPanelHtml(progress) {
     const p = progress || {};
     const phaseLabel = escapeHtml(p.phase_label || "Thinking…");
-    const thoughts = (p.thoughts || []).filter(Boolean);
-    const logLines = [...thoughts];
-    if (p.manager_plan && !logLines.includes(p.manager_plan)) {
-      logLines.unshift(p.manager_plan);
-    }
-    const logHtml = logLines.length
-      ? logLines.map((t) => `<p class="thinking-claude-line">${escapeHtml(t)}</p>`).join("")
-      : `<p class="thinking-claude-line">${phaseLabel}</p>`;
-
-    const delegationHtml = renderDelegationStepsHtml(p.steps);
+    const blocks = buildThoughtBlocks(p);
+    const blocksHtml = renderThoughtBlocksHtml(blocks);
 
     return `
       <div class="chat-msg chat-msg-assistant chat-thinking-panel" id="collab-thinking">
@@ -900,8 +1092,7 @@ const ChatWorkspace = (() => {
             <span class="thinking-claude-chevron">▾</span>
           </button>
           <div class="thinking-claude-body" id="collab-thinking-body">
-            <div class="thinking-claude-log">${logHtml}</div>
-            ${delegationHtml}
+            <div class="thought-blocks-scroll thinking-claude-log">${blocksHtml}</div>
           </div>
         </div>
       </div>`;
@@ -948,7 +1139,7 @@ const ChatWorkspace = (() => {
     if (!container) return;
     const existing = container.querySelector("#collab-thinking");
     const wasCollapsed = existing?.querySelector(".thinking-claude")?.classList.contains("collapsed");
-    const logEl = existing?.querySelector(".thinking-claude-log");
+    const logEl = existing?.querySelector(".thought-blocks-scroll");
     const logScroll = logEl?.scrollTop ?? 0;
     const logAtBottom = logEl
       ? logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 28
@@ -970,7 +1161,7 @@ const ChatWorkspace = (() => {
       toggle?.setAttribute("aria-expanded", "false");
     }
 
-    const newLog = container.querySelector("#collab-thinking .thinking-claude-log");
+    const newLog = container.querySelector("#collab-thinking .thought-blocks-scroll");
     if (newLog) {
       newLog.scrollTop = logAtBottom || forceScroll ? newLog.scrollHeight : logScroll;
     }
@@ -1019,6 +1210,9 @@ const ChatWorkspace = (() => {
         bindThoughtDropdowns($("collab-messages"));
         scrollToBottom();
         await loadSidebar();
+        if (window.Billing?.load) {
+          window.Billing.load().catch(() => {});
+        }
         stopThreadPoll();
       } catch {
         if (pollingThreadId === threadId) {
@@ -1376,7 +1570,19 @@ const ChatWorkspace = (() => {
 
   function buildPersonaCardHtml(persona, { expanded = false, showContext = false, workingInstructions = "", contextFiles = [] } = {}) {
     const { trainingLabel, statusBadge } = personaStatusBadges(persona);
-    const skillsHtml = (persona.skills || []).map((s) => `<span class="skill-tag">${escapeHtml(s)}</span>`).join("");
+    const displaySkills = filterUserSkills(persona.skills || []);
+    const skillsSection = showContext ? `
+          <div class="persona-section persona-skills-editable">
+            <h4>Skills</h4>
+            <p class="collab-drawer-hint">Up to ${MAX_AGENT_SKILLS} skills. Adding or removing skills rebuilds the agent framework.</p>
+            <div id="agent-detail-skills-${persona.session_id}" class="skill-tags"></div>
+            <div class="collab-agent-skill-add">
+              <input type="text" id="agent-detail-skill-input-${persona.session_id}" class="collab-agent-skill-input" placeholder="Add a skill…" maxlength="80" aria-label="New skill">
+              <button type="button" class="btn btn-secondary btn-sm" id="agent-detail-skill-add-btn-${persona.session_id}">Add</button>
+            </div>
+            <p id="agent-detail-skills-status-${persona.session_id}" class="collab-drawer-save-status hidden"></p>
+          </div>`
+      : `<div class="persona-section"><h4>Skills</h4><div class="skill-tags">${renderEditableSkillsHtml(displaySkills, { removable: false }) || '<span class="skill-tag">No skills listed</span>'}</div></div>`;
     const jdHtml = renderJobDescriptionHtml(persona.job_description);
 
     const contextSection = showContext ? `
@@ -1421,7 +1627,7 @@ const ChatWorkspace = (() => {
           </div>
         </div>
         <div class="persona-body">
-          <div class="persona-section"><h4>Skills</h4><div class="skill-tags">${skillsHtml || '<span class="skill-tag">No skills listed</span>'}</div></div>
+          ${skillsSection}
           ${jdHtml}
           ${contextSection}
           <div class="persona-actions">
@@ -1500,17 +1706,24 @@ const ChatWorkspace = (() => {
 
     let workingInstructions = "";
     let contextFiles = [];
-    let personaForDetail = { ...persona };
+    let personaForDetail = { ...persona, skills: filterUserSkills(persona.skills || []) };
     try {
       const data = await window.api(`/agents/${sessionId}`);
       workingInstructions = data.working_instructions || "";
       contextFiles = data.context_files || [];
+      personaForDetail = {
+        ...personaForDetail,
+        skills: filterUserSkills(data.skills || parseSkillsetString(data.skillset)),
+      };
       if (data.job_description) {
         personaForDetail = { ...personaForDetail, job_description: data.job_description };
         const idx = personas.findIndex((p) => p.session_id === sessionId);
         if (idx >= 0) personas[idx] = { ...personas[idx], job_description: data.job_description };
       }
     } catch (_) {}
+
+    agentDetailSkillsSessionId = sessionId;
+    agentDetailSkills = [...personaForDetail.skills];
 
     const container = $("collab-agent-detail-content");
     if (!container) return;
@@ -1524,6 +1737,16 @@ const ChatWorkspace = (() => {
     `;
     const card = container.querySelector(".persona-card");
     if (card) wirePersonaCard(card, persona);
+    renderAgentDetailSkills(sessionId);
+    const detailSkillInput = $(`agent-detail-skill-input-${sessionId}`);
+    const detailSkillAddBtn = $(`agent-detail-skill-add-btn-${sessionId}`);
+    detailSkillAddBtn?.addEventListener("click", () => addAgentDetailSkill(sessionId));
+    detailSkillInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addAgentDetailSkill(sessionId);
+      }
+    });
     const instrEl = $(`agent-instructions-${sessionId}`);
     if (instrEl) instrEl.value = workingInstructions || "";
     $("collab-back-agents")?.addEventListener("click", showAgentsRoster);
@@ -1888,20 +2111,10 @@ const ChatWorkspace = (() => {
   }
 
   function renderThoughtDropdown(thought, msgId) {
-    const thoughts = (thought?.thoughts || []).filter(Boolean);
-    const delegationSteps = delegationStepsForDisplay(thought?.steps || []);
-    if (!thoughts.length && !delegationSteps.length) return "";
+    const blocks = buildThoughtBlocks(thought || {});
+    if (!blocks.length) return "";
     const duration = formatThoughtDuration(thought.duration_sec);
-    const stepsHtml = thoughts.map((t, i) => `
-      <div class="chat-thought-step">
-        <span class="chat-thought-rail" aria-hidden="true">
-          <span class="chat-thought-icon${i === 0 ? " clock" : ""}">${i === 0 ? "◷" : ""}</span>
-        </span>
-        <p class="chat-thought-text">${escapeHtml(t)}</p>
-      </div>`).join("");
-    const delegationHtml = delegationSteps.length
-      ? renderDelegationStepsHtml(delegationSteps, { showActiveDetail: false })
-      : "";
+    const blocksHtml = renderThoughtBlocksHtml(blocks);
     return `
       <div class="chat-thought collapsed" data-thought-msg="${msgId}">
         <button type="button" class="chat-thought-toggle" aria-expanded="false">
@@ -1909,9 +2122,8 @@ const ChatWorkspace = (() => {
           <span class="chat-thought-chevron" aria-hidden="true">›</span>
         </button>
         <div class="chat-thought-body">
-          <div class="chat-thought-chain">
-            ${stepsHtml}
-            ${delegationHtml}
+          <div class="chat-thought-chain thought-blocks-scroll">
+            ${blocksHtml}
             <div class="chat-thought-step done">
               <span class="chat-thought-rail" aria-hidden="true">
                 <span class="chat-thought-icon done">✓</span>
@@ -1932,6 +2144,9 @@ const ChatWorkspace = (() => {
         if (!wrap) return;
         const expanded = wrap.classList.toggle("collapsed") === false;
         btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+        if (expanded) {
+          scrollThoughtBlocksToBottom(wrap.querySelector(".thought-blocks-scroll"), { force: true });
+        }
       });
     });
   }

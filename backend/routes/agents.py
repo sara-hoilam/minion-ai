@@ -29,7 +29,13 @@ from backend.services.skill_framework import (
     skills_list,
 )
 from backend.services.studio_tasks import resolve_studio_for_field
-from backend.services.thinking_principles import enrich_agent_context
+from backend.services.thinking_principles import (
+    enrich_agent_context,
+    is_platform_skill,
+    strip_platform_instruction_blocks,
+    user_skills_list,
+    user_skillset,
+)
 
 agents_bp = Blueprint("agents", __name__, url_prefix="/api/agents")
 AGENT_CONTEXT_UPLOAD = UPLOAD_FOLDER / "agent_context"
@@ -62,7 +68,7 @@ def _raw_skillset_from_request(data: dict, profile) -> str | None:
 
 def _skillset_over_limit(data: dict, profile) -> bool:
     raw = _raw_skillset_from_request(data, profile)
-    return bool(raw) and len(skills_list(raw)) > MAX_AGENT_SKILLS
+    return bool(raw) and len(user_skills_list(raw)) > MAX_AGENT_SKILLS
 
 
 @agents_bp.route("/jd-draft", methods=["POST"])
@@ -400,6 +406,22 @@ def create_agent():
     })
 
 
+def _maybe_sanitize_stored_context(session, ctx: dict) -> dict:
+    """Strip legacy platform defaults from persisted agent context."""
+    clean_skillset = user_skillset(ctx.get("skillset"))
+    clean_instructions = strip_platform_instruction_blocks(ctx.get("working_instructions")) or None
+    dirty = (
+        ctx.get("skillset") != clean_skillset
+        or (ctx.get("working_instructions") or None) != clean_instructions
+    )
+    if not dirty:
+        return ctx
+    updated = {**ctx, "skillset": clean_skillset, "working_instructions": clean_instructions}
+    session.agent_context = updated
+    db.session.commit()
+    return updated
+
+
 @agents_bp.route("/<int:session_id>", methods=["GET"])
 @login_required
 def get_agent(session_id: int):
@@ -407,7 +429,8 @@ def get_agent(session_id: int):
     if not session:
         return jsonify({"error": "Agent not found"}), 404
 
-    ctx = session.agent_context or {}
+    ctx = _maybe_sanitize_stored_context(session, dict(session.agent_context or {}))
+    visible_skills = user_skills_list(ctx.get("skillset"))
     return jsonify({
         "session_id": session.id,
         "status": session.status,
@@ -415,12 +438,17 @@ def get_agent(session_id: int):
         "field": ctx.get("field"),
         "industry": ctx.get("industry"),
         "current_job": ctx.get("current_job"),
-        "skillset": ctx.get("skillset"),
+        "skillset": user_skillset(ctx.get("skillset")),
+        "skills": visible_skills,
         "job_description": ctx.get("job_description"),
         "framework_design": ctx.get("framework_design"),
-        "working_instructions": ctx.get("working_instructions"),
+        "working_instructions": strip_platform_instruction_blocks(ctx.get("working_instructions")) or None,
         "context_files": ctx.get("context_files") or [],
-        "agent_context": ctx,
+        "agent_context": {
+            **ctx,
+            "skillset": user_skillset(ctx.get("skillset")),
+            "working_instructions": strip_platform_instruction_blocks(ctx.get("working_instructions")) or None,
+        },
     })
 
 
@@ -442,7 +470,7 @@ def update_agent_skills(session_id: int):
     seen: set[str] = set()
     for item in raw_skills:
         name = (item or "").strip()
-        if not name:
+        if not name or is_platform_skill(name):
             continue
         key = name.lower()
         if key in seen:
@@ -511,7 +539,7 @@ def update_working_context(session_id: int):
     data = request.get_json() or {}
     context = dict(session.agent_context or {})
     if "working_instructions" in data:
-        text = (data.get("working_instructions") or "").strip()
+        text = strip_platform_instruction_blocks(data.get("working_instructions"))
         context["working_instructions"] = text or None
     if "communication_style" in data:
         style = (data.get("communication_style") or "").strip().lower()

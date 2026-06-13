@@ -6,7 +6,9 @@ from flask_login import login_required, current_user
 
 from backend.models import AgentArtifact, StudioSession, TaskResponse
 from backend.services.profile_names import profile_name_parts
+from backend.services.skill_framework import MAX_AGENT_SKILLS
 from backend.services.studio_tasks import resolve_studio_for_field
+from backend.services.thinking_principles import user_skills_list
 
 home_bp = Blueprint("home", __name__, url_prefix="/api/home")
 
@@ -128,10 +130,8 @@ def get_home():
         total_tasks = len(template.get("tasks", []))
         completed_tasks = TaskResponse.query.filter_by(session_id=session.id).count()
 
-        skills = []
         skill_source = ctx.get("skillset") or (profile.skillset if profile else "")
-        if skill_source:
-            skills = [s.strip() for s in skill_source.replace("\n", ",").split(",") if s.strip()]
+        skills = user_skills_list(skill_source)[:MAX_AGENT_SKILLS]
 
         framework = _load_framework_summary(json_artifact) if json_artifact else None
         profile_text = _load_profile_preview(md_artifact) if md_artifact else None
