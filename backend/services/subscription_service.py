@@ -165,6 +165,9 @@ def apply_plan_upgrade(user: User, new_plan_id: str) -> UserSubscription:
 
     sub = get_or_create_subscription(user)
     old_plan_id = sub.plan_id or "starter"
+    if old_plan_id == new_plan_id:
+        return sub
+
     credit = upgrade_token_credit_usd(old_plan_id, new_plan_id)
 
     sub.plan_id = new_plan_id

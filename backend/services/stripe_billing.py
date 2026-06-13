@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import stripe
 
 from backend.models import User, db
-from backend.services.billing_plans import PLANS, get_plan, stripe_enabled
+from backend.services.billing_plans import PLANS, get_plan
 from backend.services.subscription_service import (
     activate_subscription,
     apply_plan_upgrade,
@@ -57,8 +57,13 @@ def create_checkout_session(user: User, plan_id: str, success_url: str, cancel_u
     return session.url
 
 
-def upgrade_subscription(user: User, new_plan_id: str) -> dict:
-    """Upgrade plan — Stripe prorates charge; tokens credited at 60% of price difference."""
+def create_upgrade_checkout_session(
+    user: User,
+    new_plan_id: str,
+    success_url: str,
+    cancel_url: str,
+) -> str:
+    """Send the user to Stripe to confirm and pay for a plan upgrade."""
     from backend.models import UserSubscription
 
     plan = get_plan(new_plan_id)
@@ -70,21 +75,75 @@ def upgrade_subscription(user: User, new_plan_id: str) -> dict:
 
     sub = UserSubscription.query.filter_by(user_id=user.id).first()
     if not sub or not sub.stripe_subscription_id:
-        raise ValueError("No active Stripe subscription to upgrade")
+        return create_checkout_session(user, new_plan_id, success_url, cancel_url)
 
+    customer_id = ensure_stripe_customer(user)
     stripe_sub = _stripe().Subscription.retrieve(sub.stripe_subscription_id)
     item_id = stripe_sub["items"]["data"][0]["id"]
-    _stripe().Subscription.modify(
+    current_price_id = stripe_sub["items"]["data"][0]["price"]["id"]
+    if current_price_id == price_id:
+        raise ValueError("Already on this plan")
+
+    # Billing Portal shows a Stripe-hosted confirmation + payment step.
+    try:
+        portal = _stripe().billing_portal.Session.create(
+            customer=customer_id,
+            return_url=success_url,
+            flow_data={
+                "type": "subscription_update_confirm",
+                "subscription_update_confirm": {
+                    "subscription": sub.stripe_subscription_id,
+                    "items": [{"id": item_id, "price": price_id, "quantity": 1}],
+                },
+                "after_completion": {
+                    "type": "redirect",
+                    "redirect": {"return_url": success_url},
+                },
+            },
+        )
+        log_event(
+            user.id,
+            "upgrade_checkout_started",
+            plan_id=new_plan_id,
+            payload={"session_id": portal.id, "via": "portal"},
+        )
+        return portal.url
+    except stripe.error.StripeError:
+        pass
+
+    # Fallback: open the proration invoice on Stripe's hosted invoice page.
+    updated = _stripe().Subscription.modify(
         sub.stripe_subscription_id,
         items=[{"id": item_id, "price": price_id}],
         proration_behavior="always_invoice",
-        metadata={"user_id": str(user.id), "plan_id": new_plan_id},
+        payment_behavior="pending_if_incomplete",
+        expand=["latest_invoice"],
     )
+    invoice = updated["latest_invoice"]
+    if isinstance(invoice, str):
+        invoice = _stripe().Invoice.retrieve(invoice)
 
-    updated = apply_plan_upgrade(user, new_plan_id)
-    sub.stripe_price_id = price_id
-    db.session.commit()
-    return {"plan_id": updated.plan_id, "token_budget_usd": float(updated.token_budget_usd)}
+    hosted = invoice.get("hosted_invoice_url")
+    if hosted and invoice.get("status") not in ("paid", "void"):
+        log_event(
+            user.id,
+            "upgrade_checkout_started",
+            plan_id=new_plan_id,
+            payload={"invoice_id": invoice.get("id"), "via": "invoice"},
+        )
+        return hosted
+
+    if invoice.get("status") == "paid":
+        apply_plan_upgrade(user, new_plan_id)
+        sub.stripe_price_id = price_id
+        db.session.commit()
+        sep = "&" if "?" in success_url else "?"
+        return f"{success_url}{sep}upgraded=1"
+
+    raise ValueError(
+        "Unable to start upgrade payment. Check your Stripe Customer Portal settings "
+        "or add a payment method, then try again."
+    )
 
 
 def schedule_cancel(user: User) -> None:
@@ -171,7 +230,8 @@ def _handle_checkout_completed(session: dict, event_id: str | None) -> None:
 
 
 def _handle_invoice_paid(invoice: dict, event_id: str | None) -> None:
-    if invoice.get("billing_reason") not in ("subscription_cycle", "subscription_create"):
+    billing_reason = invoice.get("billing_reason")
+    if billing_reason not in ("subscription_cycle", "subscription_create", "subscription_update"):
         return
     sub_id = invoice.get("subscription")
     if not sub_id:
@@ -188,7 +248,7 @@ def _handle_invoice_paid(invoice: dict, event_id: str | None) -> None:
     price_id = stripe_sub["items"]["data"][0]["price"]["id"]
     plan_id = _plan_id_from_stripe_price(price_id) or meta.get("plan_id") or "starter"
 
-    if invoice.get("billing_reason") == "subscription_create":
+    if billing_reason == "subscription_create":
         activate_subscription(
             user,
             plan_id,
@@ -197,6 +257,14 @@ def _handle_invoice_paid(invoice: dict, event_id: str | None) -> None:
             period_start=_ts_to_dt(stripe_sub.get("current_period_start")),
             period_end=_ts_to_dt(stripe_sub.get("current_period_end")),
         )
+    elif billing_reason == "subscription_update":
+        from backend.models import UserSubscription
+
+        sub = UserSubscription.query.filter_by(user_id=user.id).first()
+        if sub:
+            _sync_subscription_from_stripe(
+                user, sub, stripe_sub, price_id, plan_id, apply_upgrade_credit=True
+            )
     else:
         sub = renew_billing_period(user, plan_id)
         sub.stripe_subscription_id = sub_id
@@ -212,6 +280,44 @@ def _handle_invoice_paid(invoice: dict, event_id: str | None) -> None:
         amount_usd=(invoice.get("amount_paid") or 0) / 100.0,
         stripe_event_id=event_id,
     )
+
+
+def _sync_subscription_from_stripe(
+    user: User,
+    sub,
+    stripe_sub: dict,
+    price_id: str,
+    plan_id: str,
+    *,
+    apply_upgrade_credit: bool = False,
+) -> None:
+    """Apply local subscription state after Stripe confirms a plan change."""
+    from backend.models import UserSubscription
+
+    old_plan_id = sub.plan_id
+    old_plan = get_plan(old_plan_id) if old_plan_id else None
+    new_plan = get_plan(plan_id)
+    is_upgrade = (
+        old_plan
+        and new_plan
+        and new_plan.price_usd > old_plan.price_usd
+        and old_plan_id != plan_id
+    )
+
+    if is_upgrade and apply_upgrade_credit:
+        apply_plan_upgrade(user, plan_id)
+        sub = UserSubscription.query.filter_by(user_id=user.id).first()
+    else:
+        sub.plan_id = plan_id
+
+    sub.stripe_price_id = price_id
+    sub.stripe_subscription_id = stripe_sub.get("id") or sub.stripe_subscription_id
+    sub.status = stripe_sub.get("status") or sub.status
+    sub.cancel_at_period_end = bool(stripe_sub.get("cancel_at_period_end"))
+    sub.current_period_start = _ts_to_dt(stripe_sub.get("current_period_start"))
+    sub.current_period_end = _ts_to_dt(stripe_sub.get("current_period_end"))
+    user.subscription_status = sub.status
+    db.session.commit()
 
 
 def _handle_subscription_updated(stripe_sub: dict, event_id: str | None) -> None:
@@ -233,15 +339,9 @@ def _handle_subscription_updated(stripe_sub: dict, event_id: str | None) -> None
     sub = row or get_or_create_subscription(user)
     price_id = stripe_sub["items"]["data"][0]["price"]["id"]
     plan_id = _plan_id_from_stripe_price(price_id) or sub.plan_id
-    sub.plan_id = plan_id
-    sub.stripe_price_id = price_id
-    sub.stripe_subscription_id = sub_id
-    sub.status = stripe_sub.get("status") or sub.status
-    sub.cancel_at_period_end = bool(stripe_sub.get("cancel_at_period_end"))
-    sub.current_period_start = _ts_to_dt(stripe_sub.get("current_period_start"))
-    sub.current_period_end = _ts_to_dt(stripe_sub.get("current_period_end"))
-    user.subscription_status = sub.status
-    db.session.commit()
+    _sync_subscription_from_stripe(
+        user, sub, stripe_sub, price_id, plan_id, apply_upgrade_credit=False
+    )
     log_event(user.id, "subscription_updated", plan_id=plan_id, stripe_event_id=event_id)
 
 

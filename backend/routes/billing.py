@@ -6,10 +6,10 @@ from backend.services.billing_plans import PLAN_ORDER, PLANS, TOKENS_PER_USD, st
 from backend.services.event_logger import log_event
 from backend.services.stripe_billing import (
     create_checkout_session,
+    create_upgrade_checkout_session,
     handle_webhook_event,
     revoke_cancel,
     schedule_cancel,
-    upgrade_subscription,
 )
 from backend.services.subscription_service import (
     activate_subscription,
@@ -88,25 +88,25 @@ def upgrade_plan():
     if new_plan.price_usd <= current_plan.price_usd:
         return jsonify({"error": "Choose a higher plan to upgrade"}), 400
 
-    if not stripe_enabled() or not sub.stripe_subscription_id:
+    success_url = data.get("success_url") or f"{current_app.config.get('APP_URL', 'http://localhost:5000')}/#/plans/success"
+    cancel_url = data.get("cancel_url") or f"{current_app.config.get('APP_URL', 'http://localhost:5000')}/#/plans"
+
+    if not stripe_enabled():
         from backend.services.subscription_service import apply_plan_upgrade
 
         apply_plan_upgrade(current_user, plan_id)
         return jsonify({
             "ok": True,
             "dev_mode": True,
+            "message": f"Upgraded to {new_plan.name} (Stripe not configured).",
             "subscription": subscription_to_dict(get_subscription(current_user), current_user),
         })
 
     try:
-        result = upgrade_subscription(current_user, plan_id)
+        url = create_upgrade_checkout_session(current_user, plan_id, success_url, cancel_url)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-    return jsonify({
-        "ok": True,
-        "subscription": subscription_to_dict(get_subscription(current_user), current_user),
-        **result,
-    })
+    return jsonify({"checkout_url": url})
 
 
 @billing_bp.route("/cancel", methods=["POST"])
