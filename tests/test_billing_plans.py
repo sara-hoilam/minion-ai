@@ -18,12 +18,16 @@ from backend.services.subscription_service import (
 )
 
 
-def test_plan_monthly_token_allowance_is_sixty_percent():
+def test_plan_monthly_token_allowance():
     assert TOKEN_ALLOWANCE_RATIO == 0.60
     assert get_plan("starter").monthly_token_usd == 6.0
     assert get_plan("growth").monthly_token_usd == 15.0
     assert get_plan("professional").monthly_token_usd == 36.0
     assert get_plan("business").monthly_token_usd == 90.0
+    assert get_plan("starter").monthly_token_count == 600_000
+    assert get_plan("growth").monthly_token_count == 1_500_000
+    assert get_plan("professional").monthly_token_count == 3_600_000
+    assert get_plan("business").monthly_token_count == 9_000_000
 
 
 def test_upgrade_token_credit_is_sixty_percent_of_price_difference():
@@ -161,4 +165,5 @@ def test_billing_config_lists_all_plans():
     data = client.get("/api/billing/config").get_json()
     plan_ids = [p["id"] for p in data["plans"]]
     assert plan_ids == list(PLANS.keys())
-    assert data["token_allowance_pct"] == 60
+    assert data["tokens_per_usd"] == 100_000
+    assert data["plans"][0]["monthly_token_count"] == 600_000

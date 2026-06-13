@@ -2752,8 +2752,12 @@ const ChatWorkspace = (() => {
     return window.Billing || null;
   }
 
-  function formatAccountUsd(amount) {
-    return accountBilling()?.formatUsd?.(amount) || `$${Number(amount || 0).toFixed(2)}`;
+  function formatAccountTokens(count) {
+    return accountBilling()?.formatTokenCount?.(count) || String(count || 0);
+  }
+
+  function formatAccountTokenAllowance(plan) {
+    return accountBilling()?.formatPlanTokenAllowance?.(plan) || "";
   }
 
   function formatAccountDate(iso) {
@@ -2785,11 +2789,10 @@ const ChatWorkspace = (() => {
     const sub = billing?.getSubscription?.();
     const plans = billing?.getConfig?.()?.plans || [];
     const hasAccess = Boolean(sub?.access_granted);
-    const currentId = sub?.plan_id;
 
     const usageHtml = hasAccess ? (() => {
-      const used = Number(sub.token_used_usd || 0);
-      const budget = Number(sub.token_budget_usd || 0);
+      const used = Number(sub.token_used_count ?? sub.token_used_usd ?? 0);
+      const budget = Number(sub.token_budget_count ?? sub.token_budget_usd ?? 0);
       const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
       const cancelNote = sub.cancel_at_period_end
         ? `<p class="account-muted account-cancel-note">Cancels on ${escapeHtml(formatAccountDate(sub.current_period_end))}</p>`
@@ -2800,7 +2803,7 @@ const ChatWorkspace = (() => {
           <div class="account-token-bar" aria-hidden="true">
             <div class="account-token-fill" style="width:${pct}%"></div>
           </div>
-          <p class="account-value account-value-sm">${formatAccountUsd(used)} / ${formatAccountUsd(budget)} tokens</p>
+          <p class="account-value account-value-sm">${escapeHtml(formatAccountTokens(used))} / ${escapeHtml(formatAccountTokens(budget))}</p>
           ${cancelNote}
         </section>`;
     })() : "";
@@ -2809,33 +2812,15 @@ const ChatWorkspace = (() => {
       <div class="account-panel account-panel-payment">
         <button type="button" class="account-back-btn" id="account-payment-back">← Back</button>
         <section class="account-section account-section-flush">
-          <h4>Choose a plan</h4>
-          <p class="account-muted">Each plan includes 60% of the price as monthly API tokens. Unused tokens do not roll over.</p>
+          <p class="page-eyebrow">Subscription</p>
+          <h4 class="account-plans-title">Choose your plan</h4>
+          <p class="account-muted">Each plan includes a monthly API token allowance. Unused tokens do not roll over.</p>
         </section>
         <div id="account-payment-message"></div>
         <div id="account-payment-error"></div>
         ${usageHtml}
-        <div class="account-plan-list">
-          ${plans.map((plan) => {
-            const rank = billing.planPriceRank(plan.id);
-            const isCurrent = hasAccess && plan.id === currentId;
-            const action = billing.planActionLabel(plan.id);
-            const buyLabel = action.label === "Upgrade" || action.label === "Subscribe" ? "Buy" : action.label;
-            return `
-              <div class="account-plan-row${isCurrent ? " account-plan-row-current" : ""}">
-                <div class="account-plan-row-main">
-                  <div class="account-plan-row-head">
-                    <span class="account-plan-row-name">${escapeHtml(plan.name)}</span>
-                    ${isCurrent ? '<span class="account-plan-row-badge">Current</span>' : ""}
-                  </div>
-                  <div class="account-plan-row-price">${escapeHtml(plan.price_display)}<span>/mo</span></div>
-                  <p class="account-muted">${formatAccountUsd(plan.monthly_token_usd)} tokens/mo</p>
-                </div>
-                <button type="button" class="btn btn-primary btn-sm account-plan-buy-btn"
-                  data-plan-id="${escapeHtml(plan.id)}"
-                  ${action.disabled ? "disabled" : ""}>${escapeHtml(buyLabel)}</button>
-              </div>`;
-          }).join("")}
+        <div class="account-plans-grid">
+          ${plans.map((plan) => billing?.planCardHtml?.(plan) || "").join("")}
         </div>
         ${hasAccess ? `
         <section class="account-section account-section-compact">
@@ -2852,24 +2837,22 @@ const ChatWorkspace = (() => {
       openAccountModal();
     });
 
-    body.querySelectorAll(".account-plan-buy-btn:not([disabled])").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        try {
-          await billing.checkoutPlan(btn.dataset.planId, {
-            messageElId: "account-payment-message",
-            errorElId: "account-payment-error",
-            refreshPlansPage: false,
-            onUpdated: async () => {
-              await billing.load();
-              updateUserFooter();
-              openAccountModal();
-            },
-          });
-        } catch (_) {
-          btn.disabled = false;
-        }
-      });
+    billing?.bindPlanSelectButtons?.(body.querySelector(".account-plans-grid"), async (planId, btn) => {
+      if (btn) btn.disabled = true;
+      try {
+        await billing.checkoutPlan(planId, {
+          messageElId: "account-payment-message",
+          errorElId: "account-payment-error",
+          refreshPlansPage: false,
+          onUpdated: async () => {
+            await billing.load();
+            updateUserFooter();
+            openAccountModal();
+          },
+        });
+      } catch (_) {
+        if (btn) btn.disabled = false;
+      }
     });
 
     body.querySelector("#account-cancel-btn")?.addEventListener("click", async () => {
@@ -2918,8 +2901,8 @@ const ChatWorkspace = (() => {
       </section>`;
 
     if (hasAccess) {
-      const used = Number(sub.token_used_usd || 0);
-      const budget = Number(sub.token_budget_usd || 0);
+      const used = Number(sub.token_used_count ?? sub.token_used_usd ?? 0);
+      const budget = Number(sub.token_budget_count ?? sub.token_budget_usd ?? 0);
       const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
       const periodNote = sub.current_period_end
         ? `Resets ${formatAccountDate(sub.current_period_end)}`
@@ -2930,7 +2913,7 @@ const ChatWorkspace = (() => {
           <div class="account-token-bar" aria-hidden="true">
             <div class="account-token-fill" style="width:${pct}%"></div>
           </div>
-          <p class="account-value">${formatAccountUsd(used)} / ${formatAccountUsd(budget)}</p>
+          <p class="account-value">${escapeHtml(formatAccountTokens(used))} / ${escapeHtml(formatAccountTokens(budget))}</p>
           <p class="account-muted">${periodNote || "Monthly allowance — unused tokens do not roll over."}</p>
         </section>`;
     }
@@ -2942,7 +2925,7 @@ const ChatWorkspace = (() => {
         <section class="account-section">
           <h4>${hasAccess ? "Upgrade" : "Plan"}</h4>
           <p class="account-value">${escapeHtml(nextPlan.name)} · ${escapeHtml(nextPlan.price_display)}/mo</p>
-          <p class="account-muted">${formatAccountUsd(nextPlan.monthly_token_usd)} API tokens/mo (60%) · ${escapeHtml(nextPlan.description)}</p>
+          <p class="account-muted">${escapeHtml(formatAccountTokenAllowance(nextPlan))} · ${escapeHtml(nextPlan.description)}</p>
           <button type="button" class="btn btn-primary btn-sm" id="account-buy-next">${escapeHtml(buyLabel)}</button>
           <button type="button" class="btn btn-secondary btn-sm" id="account-view-plans">View all plans</button>
         </section>`;
@@ -2951,7 +2934,7 @@ const ChatWorkspace = (() => {
         <section class="account-section">
           <h4>Plan</h4>
           <p class="account-value">You're on our highest tier</p>
-          <p class="account-muted">Manage billing or cancel from the plans page.</p>
+          <p class="account-muted">Manage billing or cancel your subscription.</p>
           <button type="button" class="btn btn-secondary btn-sm" id="account-view-plans">Manage subscription</button>
         </section>`;
     } else {
@@ -3015,6 +2998,11 @@ const ChatWorkspace = (() => {
         if (btn) btn.disabled = false;
       }
     });
+  }
+
+  async function openAccountPlans() {
+    accountModalView = "payment";
+    await openAccountModal();
   }
 
   async function openAccountModal() {
@@ -3338,6 +3326,7 @@ const ChatWorkspace = (() => {
     init, open, refresh, showWelcome, showAgentsRoster, showPrebuiltAgentsBrowse, showAgentDetail,
     renderJobDescriptionHtml,
     loadSidebar, loadProjects, openAgentDm, openThread, openProject, openProjectAgent, updateUserFooter,
+    openAccountModal, openAccountPlans,
     shouldHandleHashChange, getCurrentMode: () => currentMode,
   };
 })();

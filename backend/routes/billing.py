@@ -2,7 +2,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from backend.models import db
-from backend.services.billing_plans import PLAN_ORDER, PLANS, stripe_enabled
+from backend.services.billing_plans import PLAN_ORDER, PLANS, TOKENS_PER_USD, stripe_enabled
 from backend.services.event_logger import log_event
 from backend.services.stripe_billing import (
     create_checkout_session,
@@ -26,7 +26,7 @@ def billing_config():
     return jsonify({
         "publishable_key": current_app.config.get("STRIPE_PUBLISHABLE_KEY", ""),
         "stripe_enabled": stripe_enabled(),
-        "token_allowance_pct": 60,
+        "tokens_per_usd": TOKENS_PER_USD,
         "plans": [PLANS[pid].to_dict() for pid in PLAN_ORDER],
     })
 

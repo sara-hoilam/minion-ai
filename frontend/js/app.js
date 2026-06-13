@@ -1383,6 +1383,26 @@ function formatUsd(amount) {
   return `$${Number(amount).toFixed(2)}`;
 }
 
+function formatTokenCount(count) {
+  const n = Number(count || 0);
+  if (n >= 1_000_000) {
+    const millions = n / 1_000_000;
+    const text = millions % 1 === 0 ? String(millions) : millions.toFixed(1);
+    return `${text}M tokens`;
+  }
+  if (n >= 1_000) {
+    const thousands = n / 1_000;
+    const text = thousands % 1 === 0 ? String(thousands) : thousands.toFixed(1);
+    return `${text}K tokens`;
+  }
+  return `${n.toLocaleString()} tokens`;
+}
+
+function formatPlanTokenAllowance(plan) {
+  if (!plan) return "";
+  return `${formatTokenCount(plan.monthly_token_count)}/mo`;
+}
+
 function formatPlanDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -1407,6 +1427,60 @@ function planPriceRank(planId) {
   return plans.findIndex((p) => p.id === planId);
 }
 
+function getCurrentPlanLabel() {
+  const sub = billingSubscription;
+  if (!sub?.access_granted) return "No plan";
+  return sub.plan_name || sub.plan_id || "Active";
+}
+
+function getNextPlanTier() {
+  const plans = billingConfig?.plans || [];
+  const sub = billingSubscription;
+  if (!sub?.access_granted) return plans[0] || null;
+  const currentIdx = planPriceRank(sub.plan_id);
+  if (currentIdx < 0 || currentIdx >= plans.length - 1) return null;
+  return plans[currentIdx + 1];
+}
+
+function planActionLabel(planId) {
+  const sub = billingSubscription;
+  const hasAccess = Boolean(sub?.access_granted);
+  const currentId = sub?.plan_id;
+  const currentRank = hasAccess && currentId ? planPriceRank(currentId) : -1;
+  const rank = planPriceRank(planId);
+  const isCurrent = hasAccess && planId === currentId;
+
+  if (isCurrent) return { label: "Current plan", disabled: true };
+  if (hasAccess && currentRank >= 0 && rank > currentRank) return { label: "Upgrade", disabled: false };
+  if (hasAccess && currentRank >= 0 && rank < currentRank) return { label: "Downgrade unavailable", disabled: true };
+  return { label: "Subscribe", disabled: false };
+}
+
+function planCardHtml(plan, { buttonClass = "plan-select-btn" } = {}) {
+  const action = planActionLabel(plan.id);
+  const sub = billingSubscription;
+  const isCurrent = Boolean(sub?.access_granted && sub?.plan_id === plan.id);
+  const buyLabel = action.label === "Upgrade" || action.label === "Subscribe" ? action.label : action.label;
+
+  return `
+    <div class="plan-card${isCurrent ? " plan-card-current" : ""}" data-plan-id="${escapeHtml(plan.id)}">
+      ${isCurrent ? '<span class="plan-card-badge">Current</span>' : ""}
+      <div class="plan-card-name">${escapeHtml(plan.name)}</div>
+      <div class="plan-card-price">${escapeHtml(plan.price_display)}<span>/mo</span></div>
+      <div class="plan-card-tokens">${escapeHtml(formatPlanTokenAllowance(plan))}</div>
+      <p class="plan-card-desc">${escapeHtml(plan.description)}</p>
+      <button type="button" class="btn btn-primary btn-block ${buttonClass}"
+        data-plan-id="${escapeHtml(plan.id)}"
+        ${action.disabled ? "disabled" : ""}>${escapeHtml(buyLabel)}</button>
+    </div>`;
+}
+
+function bindPlanSelectButtons(root, onSelect) {
+  root?.querySelectorAll(".plan-select-btn:not([disabled])").forEach((btn) => {
+    btn.addEventListener("click", () => onSelect(btn.dataset.planId, btn));
+  });
+}
+
 function renderPlansUsage() {
   const wrap = document.getElementById("plans-usage");
   if (!wrap) return;
@@ -1418,8 +1492,8 @@ function renderPlansUsage() {
     return;
   }
 
-  const used = Number(sub.token_used_usd || 0);
-  const budget = Number(sub.token_budget_usd || 0);
+  const used = Number(sub.token_used_count ?? sub.token_used_usd ?? 0);
+  const budget = Number(sub.token_budget_count ?? sub.token_budget_usd ?? 0);
   const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
   const cancelNote = sub.cancel_at_period_end
     ? `<p class="plans-usage-cancel">Cancels on ${formatPlanDate(sub.current_period_end)}</p>`
@@ -1431,7 +1505,7 @@ function renderPlansUsage() {
     <div class="plans-usage-row">
       <div class="plans-usage-stat">
         <div>Token usage</div>
-        <strong>${formatUsd(used)} / ${formatUsd(budget)}</strong>
+        <strong>${escapeHtml(formatTokenCount(used))} / ${escapeHtml(formatTokenCount(budget))}</strong>
         <div class="plans-usage-bar"><div class="plans-usage-bar-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="plans-usage-stat">
@@ -1455,44 +1529,8 @@ function renderPlansGrid() {
   const grid = document.getElementById("plans-grid");
   if (!grid || !billingConfig?.plans) return;
 
-  const sub = billingSubscription;
-  const currentId = sub?.plan_id;
-  const hasAccess = Boolean(sub?.access_granted);
-  const currentRank = hasAccess && currentId ? planPriceRank(currentId) : -1;
-
-  grid.innerHTML = billingConfig.plans.map((plan) => {
-    const rank = planPriceRank(plan.id);
-    const isCurrent = hasAccess && plan.id === currentId;
-    let actionLabel = "Subscribe";
-    let actionDisabled = false;
-
-    if (isCurrent) {
-      actionLabel = "Current plan";
-      actionDisabled = true;
-    } else if (hasAccess && currentRank >= 0 && rank > currentRank) {
-      actionLabel = "Upgrade";
-    } else if (hasAccess && currentRank >= 0 && rank < currentRank) {
-      actionLabel = "Downgrade unavailable";
-      actionDisabled = true;
-    }
-
-    return `
-      <div class="plan-card${isCurrent ? " plan-card-current" : ""}" data-plan-id="${escapeHtml(plan.id)}">
-        ${isCurrent ? '<span class="plan-card-badge">Current</span>' : ""}
-        <div class="plan-card-name">${escapeHtml(plan.name)}</div>
-        <div class="plan-card-price">${escapeHtml(plan.price_display)}<span>/mo</span></div>
-        <div class="plan-card-tokens">${formatUsd(plan.monthly_token_usd)} API tokens/mo (60%)</div>
-        <p class="plan-card-desc">${escapeHtml(plan.description)}</p>
-        <button type="button" class="btn btn-primary btn-block plan-select-btn"
-          data-plan-id="${escapeHtml(plan.id)}"
-          ${actionDisabled ? "disabled" : ""}>${actionLabel}</button>
-      </div>
-    `;
-  }).join("");
-
-  grid.querySelectorAll(".plan-select-btn:not([disabled])").forEach((btn) => {
-    btn.addEventListener("click", () => checkoutPlan(btn.dataset.planId));
-  });
+  grid.innerHTML = billingConfig.plans.map((plan) => planCardHtml(plan)).join("");
+  bindPlanSelectButtons(grid, (planId) => checkoutPlan(planId));
 }
 
 async function renderPlansPage() {
@@ -1503,9 +1541,18 @@ async function renderPlansPage() {
   renderPlansGrid();
 }
 
-async function checkoutPlan(planId) {
-  const msgEl = document.getElementById("plans-message");
+async function checkoutPlan(planId, options = {}) {
+  const {
+    messageElId = "plans-message",
+    errorElId = "plans-error",
+    refreshPlansPage = true,
+    onUpdated,
+  } = options;
+
+  const msgEl = messageElId ? document.getElementById(messageElId) : null;
+  const errEl = errorElId ? document.getElementById(errorElId) : null;
   if (msgEl) msgEl.innerHTML = "";
+  if (errEl) errEl.innerHTML = "";
 
   const sub = billingSubscription;
   const isUpgrade = Boolean(sub?.access_granted && sub?.plan_id);
@@ -1519,31 +1566,49 @@ async function checkoutPlan(planId) {
       body: JSON.stringify({
         plan_id: planId,
         success_url: `${window.location.origin}/#/plans/success`,
-        cancel_url: `${window.location.origin}/#/plans`,
+        cancel_url: `${window.location.origin}/#/home`,
       }),
     });
     if (res.checkout_url) {
       window.location.href = res.checkout_url;
-      return;
+      return res;
     }
     billingSubscription = res.subscription || await api("/billing/subscription");
     if (msgEl) {
       msgEl.innerHTML = `<div class="alert alert-success">${escapeHtml(res.message || "Plan updated.")}</div>`;
     }
     trackEvent(isUpgrade ? "plan_upgraded" : "subscription_activated", { plan_id: planId });
-    await renderPlansPage();
-    if (billingSubscription?.access_granted) {
+    if (refreshPlansPage) await renderPlansPage();
+    if (onUpdated) await onUpdated(res);
+    else if (billingSubscription?.access_granted && refreshPlansPage) {
       await enterWorkspaceAfterSubscribe();
     }
+    return res;
   } catch (err) {
-    showError("plans-error", err.message);
+    if (errEl) {
+      errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+    } else {
+      showError(errorElId || "plans-error", err.message);
+    }
+    throw err;
   }
+}
+
+async function cancelSubscription() {
+  const res = await api("/billing/cancel", { method: "POST" });
+  billingSubscription = res.subscription;
+  return res;
+}
+
+async function reactivateSubscription() {
+  const res = await api("/billing/reactivate", { method: "POST" });
+  billingSubscription = res.subscription;
+  return res;
 }
 
 async function handlePlansCancel() {
   try {
-    const res = await api("/billing/cancel", { method: "POST" });
-    billingSubscription = res.subscription;
+    const res = await cancelSubscription();
     const msgEl = document.getElementById("plans-message");
     if (msgEl && res.message) {
       msgEl.innerHTML = `<div class="alert alert-success">${escapeHtml(res.message)}</div>`;
@@ -1557,8 +1622,7 @@ async function handlePlansCancel() {
 
 async function handlePlansReactivate() {
   try {
-    const res = await api("/billing/reactivate", { method: "POST" });
-    billingSubscription = res.subscription;
+    await reactivateSubscription();
     renderPlansUsage();
     trackEvent("subscription_reactivated");
   } catch (err) {
@@ -1584,13 +1648,18 @@ document.getElementById("plans-go-home")?.addEventListener("click", () => {
 
 document.getElementById("plans-success-continue")?.addEventListener("click", async () => {
   await loadBillingData();
-  if (billingSubscription?.access_granted) {
-    await enterWorkspaceAfterSubscribe();
-  } else {
-    showView("plans");
-    await renderPlansPage();
-  }
+  await enterWorkspaceAfterSubscribe();
 });
+
+async function openAccountPlansModal() {
+  const onHome = !document.querySelector('[data-view="home"]')?.classList.contains("hidden");
+  if (!onHome) {
+    await loadHome();
+    showView("home");
+    if (window.ChatWorkspace && window.navigateCollabHash) await navigateCollabHash();
+  }
+  await window.ChatWorkspace?.openAccountPlans?.();
+}
 
 // --- Init ---
 
@@ -1616,15 +1685,13 @@ async function initApp(options = {}) {
       return;
     }
 
-    if (authRequired && !billingSubscription?.access_granted) {
-      await renderPlansPage();
-      if (!skipView) showView("plans");
-      return;
-    }
-
     if (preferView === "plans" || hash === "plans") {
-      await renderPlansPage();
-      if (!skipView) showView("plans");
+      await loadHome();
+      if (!skipView) showView("home");
+      if (window.ChatWorkspace) {
+        await navigateCollabHash();
+        if (!skipView) await window.ChatWorkspace.openAccountPlans?.();
+      }
       return;
     }
 
@@ -1655,9 +1722,8 @@ document.getElementById("show-login-footer")?.addEventListener("click", () => sc
 document.getElementById("show-register-footer")?.addEventListener("click", () => scrollToLandingAuth("register"));
 document.getElementById("auth-go-register")?.addEventListener("click", () => showView("register"));
 document.getElementById("auth-go-login")?.addEventListener("click", () => showView("login"));
-document.getElementById("go-billing")?.addEventListener("click", async () => {
-  await renderPlansPage();
-  showView("plans");
+document.getElementById("go-billing")?.addEventListener("click", () => {
+  openAccountPlansModal();
 });
 document.getElementById("go-home")?.addEventListener("click", goHome);
 document.getElementById("nav-workspace")?.addEventListener("click", () => {
@@ -1702,6 +1768,26 @@ async function bootstrap() {
   window.showView = showView;
   window.loadHome = loadHome;
   window.trackEvent = trackEvent;
+  window.Billing = {
+    load: loadBillingData,
+    getConfig: () => billingConfig,
+    getSubscription: () => billingSubscription,
+    formatUsd,
+    formatTokenCount,
+    formatPlanTokenAllowance,
+    formatPlanDate,
+    getCurrentPlanLabel,
+    getNextPlanTier,
+    planPriceRank,
+    planActionLabel,
+    planCardHtml,
+    bindPlanSelectButtons,
+    checkoutPlan,
+    cancel: cancelSubscription,
+    reactivate: reactivateSubscription,
+    renderPlansUsage,
+    renderPlansGrid,
+  };
   BackgroundWizard.init();
   if (!window.ChatWorkspace) {
     console.error("chat-workspace.js did not load. Collaboration features will be unavailable.");

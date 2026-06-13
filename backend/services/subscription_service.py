@@ -9,6 +9,7 @@ from flask import current_app
 from backend.models import BillingEvent, User, UserSubscription, db
 from backend.services.billing_plans import (
     TOKEN_ALLOWANCE_RATIO,
+    TOKENS_PER_USD,
     get_plan,
     upgrade_token_credit_usd,
 )
@@ -90,7 +91,9 @@ def subscription_to_dict(sub: UserSubscription | None, user: User) -> dict:
         "token_budget_usd": float(sub.token_budget_usd or 0) if sub else 0,
         "token_used_usd": float(sub.token_used_usd or 0) if sub else 0,
         "token_remaining_usd": sub.token_remaining_usd if sub else 0,
-        "token_allowance_pct": int(TOKEN_ALLOWANCE_RATIO * 100),
+        "token_budget_count": int(float(sub.token_budget_usd or 0) * TOKENS_PER_USD) if sub else 0,
+        "token_used_count": int(float(sub.token_used_usd or 0) * TOKENS_PER_USD) if sub else 0,
+        "token_remaining_count": int(sub.token_remaining_usd * TOKENS_PER_USD) if sub else 0,
         "current_period_start": sub.current_period_start.isoformat() if sub and sub.current_period_start else None,
         "current_period_end": sub.current_period_end.isoformat() if sub and sub.current_period_end else None,
         "cancel_at_period_end": bool(sub.cancel_at_period_end) if sub else False,

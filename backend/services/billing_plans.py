@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 
 TOKEN_ALLOWANCE_RATIO = 0.60
+TOKENS_PER_USD = 100_000
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,10 @@ class Plan:
     def monthly_token_usd(self) -> float:
         return round(self.price_usd * TOKEN_ALLOWANCE_RATIO, 2)
 
+    @property
+    def monthly_token_count(self) -> int:
+        return int(self.monthly_token_usd * TOKENS_PER_USD)
+
     def stripe_price_id(self) -> str:
         return (os.getenv(self.stripe_price_env) or "").strip()
 
@@ -30,7 +35,7 @@ class Plan:
             "price_usd": self.price_usd,
             "price_display": f"${self.price_usd}",
             "monthly_token_usd": self.monthly_token_usd,
-            "token_allowance_pct": int(TOKEN_ALLOWANCE_RATIO * 100),
+            "monthly_token_count": self.monthly_token_count,
             "description": self.description,
             "stripe_configured": bool(self.stripe_price_id()),
         }
